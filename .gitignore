@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+
+# Credentials / OAuth / local auth
+*token*.json
+*oauth*.json
+*device_flow*.json
+*client_secret*.json
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Generated dashboard outputs and private data
+briefings/
+dashboards/
+output/
+exports/
+data/
+cache/
+*.log
+*.sqlite
+*.sqlite3
+*.db
+*.json
+!examples/*.json
+!schemas/*.json
+
+# Finance source files — never commit live operating data
+*.xlsx
+*.xlsm
+*.xls
+*.csv
+*.pdf
+*.docx
+
+# OS/editor
+.DS_Store
+.idea/
+.vscode/
