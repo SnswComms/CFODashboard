@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  python-safety-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile Python files
+        run: python -m compileall -q src/snsw_cfo_dashboard
+      - name: Basic secret pattern scan
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re, sys
+          root = Path('.')
+          patterns = {
+              'github token': re.compile(r'ghp_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}'),
+              'generic access token': re.compile(r'(?i)(access_token|refresh_token|client_secret|password|api[_-]?key)\s*[=:]\s*["\']?[^"\'\s]{8,}'),
+              'bearer token': re.compile(r'(?i)bearer\s+[A-Za-z0-9._-]{20,}'),
+          }
+          hits = []
+          for p in root.rglob('*'):
+              if not p.is_file() or '.git' in p.parts or '__pycache__' in p.parts:
+                  continue
+              if p.suffix.lower() in {'.png', '.jpg', '.jpeg'}:
+                  continue
+              text = p.read_text(errors='ignore')
+              for i, line in enumerate(text.splitlines(), 1):
+                  for name, rx in patterns.items():
+                      if rx.search(line):
+                          if p.name == '.env.example':
+                              continue
+                          hits.append(f'{p}:{i}:{name}')
+          if hits:
+              print('Potential secret hits:')
+              print('\n'.join(hits[:100]))
+              sys.exit(1)
+          print('No basic secret-pattern hits')
+          PY
