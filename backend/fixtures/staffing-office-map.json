@@ -1,0 +1,174 @@
+{
+  "generated_at": "2026-01-01T00:00:00",
+  "title": "Office Staff Modelling Map",
+  "sources": {
+    "current_staff_allocation_csv": "synthetic://payroll-staff-costs/current_25_26_staff_allocation_with_overrides.csv",
+    "payroll_person_by_fy_csv": "synthetic://payroll-staff-costs/payroll_person_by_fy_sensitive.csv",
+    "staff_role_overrides_json": "synthetic://payroll-staff-costs/staff-role-overrides.json"
+  },
+  "basis": {
+    "office_categories": [
+      "Admin / Executive",
+      "Finance",
+      "Department director",
+      "Department support",
+      "Other conference"
+    ],
+    "trend_fys": ["23-24", "24-25", "25-26"],
+    "trend_method": "FY2023-24 to FY2025-26 payroll totals are joined by staff_id and grouped by the current final_category from current_25_26_staff_allocation_with_overrides.csv.",
+    "remote_worker_funding_offset_basis": "Available data has no explicit remote-worker or funding-offset field. The dashboard therefore shows a warning and lists inferred excluded/on-charge candidates only where category/role/area/notes include school, AAV, exclude, national, Bible Worker, remote, offset, or funding terms."
+  },
+  "summary": {
+    "current_staff_rows": 3,
+    "office_person_rows": 2,
+    "office_cost_25_26": 350000,
+    "all_current_staff_cost_25_26": 400000,
+    "office_share_of_current_staff_cost": 0.875,
+    "unclassified_rows": 1,
+    "unclassified_cost_25_26": 50000,
+    "trend_total_23_24": 280000,
+    "trend_total_24_25": 280000,
+    "trend_total_25_26": 350000,
+    "trend_delta_23_24_to_25_26": 70000,
+    "trend_pct_23_24_to_25_26": 0.25
+  },
+  "category_totals": [
+    {
+      "category": "Admin / Executive",
+      "people_count": 1,
+      "cost_25_26": 200000,
+      "fy_totals": { "23-24": 160000, "24-25": 160000, "25-26": 200000 },
+      "delta_24_25_to_25_26": 40000,
+      "pct_24_25_to_25_26": 0.25
+    },
+    {
+      "category": "Finance",
+      "people_count": 1,
+      "cost_25_26": 150000,
+      "fy_totals": { "23-24": 120000, "24-25": 120000, "25-26": 150000 },
+      "delta_24_25_to_25_26": 30000,
+      "pct_24_25_to_25_26": 0.25
+    },
+    {
+      "category": "Department director",
+      "people_count": 0,
+      "cost_25_26": 0,
+      "fy_totals": { "23-24": 0, "24-25": 0, "25-26": 0 },
+      "delta_24_25_to_25_26": 0,
+      "pct_24_25_to_25_26": null
+    },
+    {
+      "category": "Department support",
+      "people_count": 0,
+      "cost_25_26": 0,
+      "fy_totals": { "23-24": 0, "24-25": 0, "25-26": 0 },
+      "delta_24_25_to_25_26": 0,
+      "pct_24_25_to_25_26": null
+    },
+    {
+      "category": "Other conference",
+      "people_count": 0,
+      "cost_25_26": 0,
+      "fy_totals": { "23-24": 0, "24-25": 0, "25-26": 0 },
+      "delta_24_25_to_25_26": 0,
+      "pct_24_25_to_25_26": null
+    }
+  ],
+  "trend_totals": { "23-24": 280000, "24-25": 280000, "25-26": 350000 },
+  "office_people": [
+    {
+      "staff_id": "STF-001",
+      "payroll_name": "Example Officer A",
+      "final_category": "Admin / Executive",
+      "analysis_category": "Admin / Executive",
+      "category": "Admin / Executive",
+      "role": "CFO",
+      "job_or_area": "Executive office",
+      "notes": "",
+      "cost_25_26": 200000,
+      "fy_totals": { "23-24": 160000, "24-25": 160000, "25-26": 200000 },
+      "payroll_fy_rows": [
+        { "staff_id": "STF-001", "fy": "23-24", "total": 160000, "hours": 1900 },
+        { "staff_id": "STF-001", "fy": "24-25", "total": 160000, "hours": 1900 },
+        { "staff_id": "STF-001", "fy": "25-26", "total": 200000, "hours": 1900 }
+      ],
+      "override_object": {
+        "role": "CFO",
+        "category": "Admin / Executive",
+        "comment": "synthetic example override"
+      },
+      "delta_24_25_to_25_26": 40000,
+      "pct_24_25_to_25_26": 0.25
+    },
+    {
+      "staff_id": "STF-002",
+      "payroll_name": "Example Officer B",
+      "final_category": "Finance",
+      "analysis_category": "Finance",
+      "category": "Finance",
+      "role": "Accountant",
+      "job_or_area": "Finance team",
+      "notes": "",
+      "cost_25_26": 150000,
+      "fy_totals": { "23-24": 120000, "24-25": 120000, "25-26": 150000 },
+      "payroll_fy_rows": [
+        { "staff_id": "STF-002", "fy": "23-24", "total": 120000, "hours": 1900 },
+        { "staff_id": "STF-002", "fy": "24-25", "total": 120000, "hours": 1900 },
+        { "staff_id": "STF-002", "fy": "25-26", "total": 150000, "hours": 1900 }
+      ],
+      "override_object": {},
+      "delta_24_25_to_25_26": 30000,
+      "pct_24_25_to_25_26": 0.25
+    }
+  ],
+  "unclassified_warnings": [
+    {
+      "staff_id": "STF-003",
+      "payroll_name": "Example Worker C",
+      "final_category": "",
+      "analysis_category": "",
+      "category": "",
+      "role": "",
+      "job_or_area": "Example school support",
+      "notes": "school-funded position (synthetic sample)",
+      "cost_25_26": 50000,
+      "fy_totals": { "23-24": 40000, "24-25": 40000, "25-26": 50000 },
+      "payroll_fy_rows": [
+        { "staff_id": "STF-003", "fy": "23-24", "total": 40000, "hours": 800 },
+        { "staff_id": "STF-003", "fy": "24-25", "total": 40000, "hours": 800 },
+        { "staff_id": "STF-003", "fy": "25-26", "total": 50000, "hours": 800 }
+      ],
+      "override_object": {},
+      "delta_24_25_to_25_26": 10000,
+      "pct_24_25_to_25_26": 0.25
+    }
+  ],
+  "remote_funding_offset": {
+    "notes": [
+      "No explicit remote-worker flag was found in the available CSV/JSON inputs.",
+      "No explicit funding-offset field was found; offset/on-charge candidates below are inferred only from category, role, area, and notes text."
+    ],
+    "candidate_rows": [
+      {
+        "staff_id": "STF-003",
+        "payroll_name": "Example Worker C",
+        "final_category": "",
+        "analysis_category": "",
+        "category": "",
+        "role": "",
+        "job_or_area": "Example school support",
+        "notes": "school-funded position (synthetic sample)",
+        "cost_25_26": 50000,
+        "fy_totals": { "23-24": 40000, "24-25": 40000, "25-26": 50000 },
+        "payroll_fy_rows": [
+          { "staff_id": "STF-003", "fy": "23-24", "total": 40000, "hours": 800 },
+          { "staff_id": "STF-003", "fy": "24-25", "total": 40000, "hours": 800 },
+          { "staff_id": "STF-003", "fy": "25-26", "total": 50000, "hours": 800 }
+        ],
+        "override_object": {},
+        "delta_24_25_to_25_26": 10000,
+        "pct_24_25_to_25_26": 0.25
+      }
+    ]
+  }
+}

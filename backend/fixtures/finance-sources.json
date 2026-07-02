@@ -1,0 +1,97 @@
+{
+  "generated_at": "2026-01-01T00:00:00+00:00",
+  "lanes": [
+    {
+      "id": "myob_morpheus",
+      "name": "MYOB / Morpheus current finance API",
+      "status": "confirmed broader read-only connector / some GL forms permission-blocked",
+      "coverage": "Recent MYOB era; confirmed Account, JournalTransaction, Customer, Vendor, Bill, Invoice, Payment plus benefits-tracker account 312510",
+      "role": "Current MYOB Advanced read-only extraction can seed chart of accounts, journal samples, AR/AP objects and payments. Financial statement engine still needs TrialBalance/Ledger/FinancialPeriod/Subaccount rights or alternate report endpoints.",
+      "next": "Turn broad cache into entity cash/P&L source objects where possible; request/enable read-only rights for Ledger, TrialBalance, FinancialPeriod and Subaccount or locate equivalent report endpoints.",
+      "source_truth": [
+        "Broad cache: finance/myob-cache/morpheus-broad-readonly/morpheus-broad-readonly-cache.json",
+        "Accessible endpoints confirmed: Account, JournalTransaction, Customer, Vendor, Bill, Invoice, Payment",
+        "Benefits cache: finance/myob-cache/morpheus-benefits-312510/morpheus-benefits-312510-cache.json",
+        "Inventory: projects/cfo-second-brain/indexes/morpheus-myob-access-inventory.md"
+      ],
+      "risk": "This proves broader MYOB read access, but Ledger/TrialBalance/FinancialPeriod/Subaccount are currently permission-blocked, so full financial statement extraction is not complete.",
+      "confidence": "medium"
+    },
+    {
+      "id": "sun_legacy",
+      "name": "SUN legacy finance history",
+      "status": "required / partially represented through exports",
+      "coverage": "Pre-MYOB historical finance; long-run GL and function history",
+      "role": "Older GL, field/function staff-cost history, entity results, budget-vs-actual history before MYOB.",
+      "next": "Locate or request complete SUN exports: chart/accounts, periods, entities, departments/functions, journals, budgets, trial balances, P&L/balance sheet outputs.",
+      "source_truth": [
+        "SUN 6 Budget Master / operating workbooks",
+        "SUN5 operating report extracts",
+        "Trial Balance / Caseware files across SNC/SNU/SNE/schools",
+        "SUN to MYOB migration/reconciliation files from 2025",
+        "Inventory: projects/cfo-second-brain/indexes/sun-legacy-finance-source-inventory.md"
+      ],
+      "risk": "Without SUN, long-run trends will be stitched from reports rather than source ledger.",
+      "confidence": "medium"
+    },
+    {
+      "id": "velixo_workbooks",
+      "name": "Velixo / Excel management workbooks",
+      "status": "available locally",
+      "coverage": "Budget/spend dashboards, May 2026 operating graph, department workbooks",
+      "role": "Fast source for existing dashboards, budgets, February/May actuals, cash sections, department/function summaries.",
+      "next": "Create a workbook index that maps every dashboard metric to workbook/sheet/cell/period.",
+      "source_truth": [
+        "finance/excel-index metadata",
+        "briefings/dashboards generated outputs",
+        "tools/dashboard generators"
+      ],
+      "risk": "Workbook extracts can mix periods/bases unless every figure carries source metadata.",
+      "confidence": "high"
+    },
+    {
+      "id": "payroll",
+      "name": "Payroll / staff cost history",
+      "status": "available from FY2023-24 onward",
+      "coverage": "Payroll person-by-FY, current allocation overrides and staff-role mapping",
+      "role": "People cost, office/staffing models, Ministry Field Map cost layer, funding-offset checks.",
+      "next": "Add explicit funding-offset, remote-worker and entity-benefit fields; reconstruct older people history from SUN/session/email evidence.",
+      "source_truth": [
+        "finance/payroll-staff-costs/payroll_person_by_fy_sensitive.csv",
+        "current_25_26_staff_allocation_with_overrides.csv",
+        "staff-role-overrides.json"
+      ],
+      "risk": "FY2023-24+ only; older headcount must not be inferred without evidence.",
+      "confidence": "high"
+    },
+    {
+      "id": "session_reports",
+      "name": "Constituency/session published reports",
+      "status": "catalogued",
+      "coverage": "2005, 2008, 2011, 2014, 2017, 2021, 2025 session packs",
+      "role": "Member-reportable historical trend spine and published-claims source lane.",
+      "next": "Targeted extraction of tithe, membership, entity finance, school, AAV, property/loan and staffing claims with page/slide references.",
+      "source_truth": [
+        "Session SNSW source folders",
+        "constituency-history-data.json"
+      ],
+      "risk": "Published claims are not ledger truth; use Investigations Layer to challenge where needed.",
+      "confidence": "high for catalogue, low/medium for extracted metrics until parsed"
+    },
+    {
+      "id": "email_intelligence",
+      "name": "Email intelligence / attachment text",
+      "status": "indexed locally",
+      "coverage": "About 89,000 emails; about 42,000 extracted attachment texts at last generation",
+      "role": "Investigations Layer, source citations, person/org history, contradictions, approvals and context behind financial decisions.",
+      "next": "Wire the Email Intelligence page into claim cards so every weak source can launch a targeted search packet.",
+      "source_truth": [
+        "email-knowledge/_state/smart_mail_index.sqlite",
+        "email-knowledge/_state/attachment_text.sqlite",
+        "tools/outlook-reader/smart_mail_lookup.py"
+      ],
+      "risk": "Email evidence is context/support, not automatically authoritative finance truth.",
+      "confidence": "high"
+    }
+  ]
+}

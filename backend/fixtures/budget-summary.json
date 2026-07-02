@@ -1,0 +1,32 @@
+{
+  "actual": {
+    "conference_income": 2100000,
+    "conference_expense": 2300000,
+    "conference_net": -200000,
+    "aav_income": 1200000,
+    "aav_expense": 950000,
+    "aav_net": 250000,
+    "overall_income": 3300000,
+    "overall_expense": 3250000,
+    "overall_net": 50000
+  },
+  "cash_rows": [
+    {
+      "account": "Example Operating Account",
+      "type": "At call",
+      "may": 1500000
+    },
+    {
+      "account": "Example Term Deposit",
+      "type": "Term deposit",
+      "may": 2500000
+    },
+    {
+      "account": "Example CMF Account",
+      "type": "At call",
+      "may": 750000
+    }
+  ],
+  "source": "synthetic://operating-statement-graphs.xlsx",
+  "modified": null
+}

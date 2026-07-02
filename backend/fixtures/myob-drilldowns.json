@@ -1,0 +1,100 @@
+{
+  "generated_at": "2026-06-01T00:00:00+00:00",
+  "accounts": {
+    "703430": {
+      "generated_at": "2026-06-01T00:00:00+00:00",
+      "account": "703430",
+      "from_date": "2025-07-01",
+      "source": "Synthetic MYOB account drilldown fixture",
+      "limits": { "bill_limit": 4000, "journal_limit": 1500 },
+      "bill_lines": [
+        {
+          "bill": { "Date": "2025-08-02T00:00:00", "ReferenceNbr": "BILL-0002", "Vendor": "Example Vendor B", "BranchID": "MAIN", "Description": "Example venue bill", "Amount": 250, "Balance": 250 },
+          "line": { "Account": "703430", "Amount": 250, "ExtendedCost": 250, "Subaccount": "000-000", "TransactionDescription": "Example venue hire", "Project": "X" }
+        }
+      ],
+      "journal_lines": [
+        {
+          "journal": { "TransactionDate": "2025-07-20T00:00:00", "BatchNbr": "GJ-0001", "BranchID": "MAIN", "Description": "Example journal one" },
+          "line": { "Account": "703430", "DebitAmount": 100, "CreditAmount": 0, "Subaccount": "000-000", "Project": "X", "TransactionDescription": "Evangelism supplies" }
+        },
+        {
+          "journal": { "TransactionDate": "2025-08-05T00:00:00", "BatchNbr": "GJ-0002", "BranchID": "SOUTH", "Description": "Example journal two" },
+          "line": { "Account": "703430", "DebitAmount": 0, "CreditAmount": 40, "Subaccount": "000-000", "Project": "", "TransactionDescription": "Evangelism refund" }
+        }
+      ],
+      "errors": [],
+      "journals_scanned": 2,
+      "derived": {
+        "bill_line_count": 1,
+        "bill_line_total": 250,
+        "journal_line_count": 2,
+        "journal_debit_total": 100,
+        "journal_credit_total": 40,
+        "journal_net_debit": 60
+      }
+    },
+    "703100": {
+      "generated_at": "2026-06-01T00:00:00+00:00",
+      "account": "703100",
+      "from_date": "2025-07-01",
+      "source": "Synthetic MYOB account drilldown fixture",
+      "limits": { "bill_limit": 4000, "journal_limit": 1500 },
+      "bill_lines": [
+        {
+          "bill": { "Date": "2025-07-10T00:00:00", "ReferenceNbr": "BILL-0001", "Vendor": "Example Vendor A", "BranchID": "MAIN", "Description": "Example catering bill", "Amount": 500, "Balance": 0 },
+          "line": { "Account": "703100", "Amount": 500, "ExtendedCost": 500, "Subaccount": "000-000", "TransactionDescription": "Example catering line", "Project": "X" }
+        }
+      ],
+      "journal_lines": [
+        {
+          "journal": { "TransactionDate": "2025-07-20T00:00:00", "BatchNbr": "GJ-0001", "BranchID": "MAIN", "Description": "Example journal one" },
+          "line": { "Account": "703100", "DebitAmount": 60, "CreditAmount": 0, "Subaccount": "000-000", "Project": "X", "TransactionDescription": "Catering supplies" }
+        }
+      ],
+      "errors": [],
+      "journals_scanned": 2,
+      "derived": {
+        "bill_line_count": 1,
+        "bill_line_total": 500,
+        "journal_line_count": 1,
+        "journal_debit_total": 60,
+        "journal_credit_total": 0,
+        "journal_net_debit": 60
+      }
+    }
+  },
+  "summary": {
+    "accounts": [
+      {
+        "account": "703430",
+        "label": "Local church evangelism",
+        "exit_code": 0,
+        "output": "synthetic://myob-account-703430-drilldown.json",
+        "generated_at": "2026-06-01T00:00:00+00:00",
+        "derived": {
+          "bill_line_count": 1,
+          "bill_line_total": 250,
+          "journal_line_count": 2,
+          "journal_debit_total": 100,
+          "journal_credit_total": 40,
+          "journal_net_debit": 60
+        },
+        "errors": []
+      },
+      {
+        "account": "703100",
+        "output": "synthetic://myob-account-703100-drilldown.json",
+        "derived": {
+          "bill_line_count": 1,
+          "bill_line_total": 500,
+          "journal_line_count": 1,
+          "journal_debit_total": 60,
+          "journal_credit_total": 0,
+          "journal_net_debit": 60
+        },
+        "errors": []
+      }
+    ]
+  }
+}

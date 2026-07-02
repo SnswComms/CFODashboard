@@ -1,0 +1,10 @@
+{
+  "updated_at": null,
+  "roles": {
+    "STF-001": {
+      "role": "CFO",
+      "category": "Admin / Executive",
+      "comment": "synthetic example override"
+    }
+  }
+}

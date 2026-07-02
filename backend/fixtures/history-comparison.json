@@ -1,0 +1,61 @@
+{
+  "generated_at": "2026-01-01T00:00:00",
+  "rows": [
+    {
+      "area": "Whole staff cost / payroll",
+      "status": "Available",
+      "period": "FY2023-24, FY2024-25, FY2025-26",
+      "what": "3 FY totals; 60 unique staff in source (synthetic example)",
+      "link": "staff-cost-dashboard.html",
+      "source": "synthetic staff cost extract"
+    },
+    {
+      "area": "Conference office staff cost",
+      "status": "Available",
+      "period": "FY2023-24 to FY2025-26",
+      "what": "Office cost trend available in synthetic example; current office people 10",
+      "link": "office-staff-modelling-map.html",
+      "source": "synthetic payroll person-by-FY extract"
+    },
+    {
+      "area": "Field / pastoral historical actuals",
+      "status": "Not indexed yet",
+      "period": "Historical actuals not indexed",
+      "what": "Build historical field-staff-cost index with source workbook/account/function/FY/actual/confidence.",
+      "link": "field-pastoral-staffing-dashboard.html",
+      "source": "Legacy SUN/workbooks need indexing"
+    },
+    {
+      "area": "Department budget vs actual by function",
+      "status": "Current year only",
+      "period": "FY2026 budget vs current actuals",
+      "what": "FY2026 approved budget vs current actuals exists. Prior-year department/function budget and actual history not yet indexed.",
+      "link": "department-budget-dashboard.html",
+      "source": "synthetic department budget dashboard data"
+    },
+    {
+      "area": "SNC operating / cash / summary",
+      "status": "Current year only",
+      "period": "FY2026/current operating summary",
+      "what": "Current budget/spend and cash rows exist. Prior-year operating/cash trend needs indexed operating statement history.",
+      "link": "snc-2026-budget-spend-dashboard.html",
+      "source": "synthetic operating statement summary"
+    },
+    {
+      "area": "MYOB current-era account detail",
+      "status": "Available from 2025-07-01 sample",
+      "period": "MYOB era from 2025-07-01 seed cache",
+      "what": "Account, journal, AP/AR samples and selected account detail pages exist; not prior-year SUN history.",
+      "link": "myob-account-drilldown-dashboard.html",
+      "source": "synthetic://finance/myob-cache"
+    },
+    {
+      "area": "SUN legacy finance history",
+      "status": "Inventory exists / parser needed",
+      "period": "Pre-MYOB historical years",
+      "what": "SUN/legacy source inventory exists, but repeatable parser/indexer still needed before charts should claim trends.",
+      "link": "finance-source-status.html",
+      "source": "synthetic://indexes/sun-legacy-finance-source-inventory.md"
+    }
+  ]
+}

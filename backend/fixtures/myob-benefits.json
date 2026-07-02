@@ -1,0 +1,97 @@
+{
+  "generated_at": "2026-06-01T00:00:00+00:00",
+  "base_url": "synthetic://benefits-tracker",
+  "scope": "Benefits Tracker for MYOB Advanced account 312510 (synthetic fixture)",
+  "read_only_policy": "GET-only",
+  "endpoints": {
+    "summary_full": {
+      "ok": true,
+      "url": "synthetic://api/summary/full",
+      "status": 200,
+      "elapsed_ms": 10,
+      "data": {
+        "account": {
+          "balance": 5000,
+          "total_credit": 20000,
+          "total_debit": 15000,
+          "ytd_credit": 4000,
+          "ytd_debit": 3000,
+          "transaction_count": 12,
+          "as_of": "2026-05-31"
+        }
+      }
+    },
+    "recent_transactions": {
+      "ok": true,
+      "url": "synthetic://api/search",
+      "status": 200,
+      "elapsed_ms": 12,
+      "data": {
+        "transactions": [
+          { "date": "2026-05-10", "employee_code": "E001", "category": "Book allowance", "journal_description": "Example book purchase", "debit": 100, "credit": 0 },
+          { "date": "2026-05-12", "employee_code": "E002", "category": "Book allowance", "journal_description": "Example book purchase", "debit": 50, "credit": 0 },
+          { "date": "2026-05-20", "employee_code": "E001", "category": "Conference travel", "journal_description": "Example travel reimbursement", "debit": 200, "credit": 0 },
+          { "date": "2026-05-25", "employee_code": "E002", "category": "Adjustment", "journal_description": "Example credit adjustment", "debit": 0, "credit": 75 }
+        ]
+      }
+    }
+  },
+  "employees": {
+    "E001": {
+      "identity": { "code": "E001", "name": "Example Pastor A" },
+      "summary": {
+        "ok": true,
+        "status": 200,
+        "data": {
+          "employee": { "code": "E001", "name": "Example Pastor A", "role_or_church": "Example Church North" },
+          "totals": { "balance": 300, "ytd_debit": 300, "ytd_credit": 0, "transaction_count": 2 }
+        }
+      },
+      "profile": { "ok": true, "status": 200, "data": { "code": "E001", "name": "Example Pastor A" } },
+      "ledger": {
+        "ok": true,
+        "status": 200,
+        "data": {
+          "entries": [
+            { "date": "2026-05-10", "category": "Book allowance", "debit": 100, "credit": 0 },
+            { "date": "2026-05-20", "category": "Conference travel", "debit": 200, "credit": 0 }
+          ]
+        }
+      }
+    },
+    "E002": {
+      "identity": { "code": "E002", "name": "Example Pastor B" },
+      "summary": {
+        "ok": true,
+        "status": 200,
+        "data": {
+          "employee": { "code": "E002", "name": "Example Pastor B", "role_or_church": "Example Church South" },
+          "totals": { "balance": -25, "ytd_debit": 50, "ytd_credit": 75, "transaction_count": 2 }
+        }
+      },
+      "profile": { "ok": true, "status": 200, "data": { "code": "E002", "name": "Example Pastor B" } },
+      "ledger": { "ok": false, "status": 404, "error": "ledger unavailable in fixture" }
+    }
+  },
+  "derived": {
+    "account_balance": 5000,
+    "account_total_credit": 20000,
+    "account_total_debit": 15000,
+    "account_ytd_credit": 4000,
+    "account_ytd_debit": 3000,
+    "account_transaction_count": 12,
+    "account_as_of": "2026-05-31",
+    "eligible_employee_count": 2,
+    "employee_detail_count": 2,
+    "recent_transaction_count": 4,
+    "recent_transaction_total_debit": 350,
+    "recent_transaction_total_credit": 75,
+    "recent_transaction_employee_codes": ["E001", "E002"],
+    "recent_transaction_category_rollup": {
+      "Book allowance": { "count": 2, "debit": 150, "credit": 0 },
+      "Conference travel": { "count": 1, "debit": 200, "credit": 0 },
+      "Adjustment": { "count": 1, "debit": 0, "credit": 75 }
+    },
+    "failed_endpoints": {}
+  }
+}

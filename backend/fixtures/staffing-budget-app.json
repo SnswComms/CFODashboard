@@ -1,0 +1,156 @@
+{
+  "generated_at": "2026-01-01T00:00:00",
+  "sources": {
+    "pastoral_json": "synthetic://pastoral-budget-map/app-data.canonical.json",
+    "dashboard_json": "synthetic://dashboards/department-budget-dashboard-data.json",
+    "assignments_csv": "synthetic://sanitized-staffing/snsw_pastoral_assignments_current_corrected.csv",
+    "office_csv": "synthetic://sanitized-staffing/snsw_office_team_shared_services_only.csv"
+  },
+  "periods": {
+    "pastoral_data": "Canonical pastoral-map snapshot created 2026-01-01 in synthetic fixtures; attendance period: synthetic sample",
+    "assignments": "Sanitized pastoral assignments CSV (synthetic sample); assignment sheet period not stated in file",
+    "budget_book": "FY2026 synthetic budget basis; spend/actual columns from synthetic sample period; source department dashboard JSON generated 2026-01-01T00:00:00",
+    "budget_book_budget_basis": "FY2026 synthetic budget basis",
+    "budget_book_spend_basis": "synthetic sample period",
+    "scenario": "2027 planning scenario; user-entered tithe/package assumptions, not approved budget"
+  },
+  "assumptions": {
+    "package_cost": 150000,
+    "package_cost_note": "Temporary placeholder until exact FTE and employment-cost figures are supplied.",
+    "target_staff_ratio": 0.75,
+    "default_tithe_target": 5200000
+  },
+  "counts": {
+    "active_field_pastors": 2,
+    "vacant_field_posts": 1,
+    "office_staff": 2,
+    "formal_churches_companies": 3,
+    "emerging_groups": 1,
+    "attendance_captured": 309
+  },
+  "costs": {
+    "field_placeholder_cost": 300000,
+    "office_placeholder_cost": 300000,
+    "total_placeholder_staff_cost": 600000,
+    "placeholder_pastoral_cost_from_handoff": 3000000,
+    "placeholder_office_cost_from_handoff": 2400000
+  },
+  "budget_book": {
+    "field_staff_budget": 1100000,
+    "office_staff_budget": 820000,
+    "visible_staff_budget_total": 1920000,
+    "field_staff_lines": [
+      {
+        "department": "FIELD",
+        "line": "Salaries and wages",
+        "budget": 900000,
+        "spent": 100000,
+        "remaining": 800000
+      },
+      {
+        "department": "FIELD",
+        "line": "Superannuation",
+        "budget": 200000,
+        "spent": 20000,
+        "remaining": 180000
+      }
+    ],
+    "office_staff_lines": [
+      {
+        "department": "ADMINISTRATION",
+        "line": "Salaries and wages",
+        "budget": 700000,
+        "spent": 90000,
+        "remaining": 610000
+      },
+      {
+        "department": "YOUTH MINISTRY",
+        "line": "Salaries and wages",
+        "budget": 120000,
+        "spent": 10000,
+        "remaining": 110000
+      }
+    ]
+  },
+  "field_pastors": ["Example Pastor A", "Example Pastor B"],
+  "vacant_posts": ["Example Church South"],
+  "office_staff": [
+    {
+      "team_member_name": "Example Officer A",
+      "shared_service_role": "CFO",
+      "status": "current"
+    },
+    {
+      "team_member_name": "Example Officer B",
+      "shared_service_role": "Accountant",
+      "status": "current"
+    }
+  ],
+  "pastor_load": [
+    {
+      "pastor": "VACANT / TBD",
+      "church_count": 1,
+      "emerging_group_count": 0,
+      "total_entities": 1,
+      "attendance": 50,
+      "churches": ["Example Church South"],
+      "emerging_groups": [],
+      "is_vacant": true
+    },
+    {
+      "pastor": "Example Pastor B",
+      "church_count": 1,
+      "emerging_group_count": 1,
+      "total_entities": 2,
+      "attendance": 80,
+      "churches": ["Example Church West"],
+      "emerging_groups": ["Example Group North"],
+      "is_vacant": false
+    },
+    {
+      "pastor": "Example Pastor A",
+      "church_count": 1,
+      "emerging_group_count": 0,
+      "total_entities": 1,
+      "attendance": 179,
+      "churches": ["Example Church East"],
+      "emerging_groups": [],
+      "is_vacant": false
+    }
+  ],
+  "exact_payroll": {
+    "source": "synthetic://payroll-staff-costs/current_25_26_staff_allocation_with_overrides.csv",
+    "period": "FY2025-26 payroll allocation extract with manual role/category corrections",
+    "by_category": [
+      { "category": "Admin / Executive", "people": 1, "cost": 200000 },
+      { "category": "Finance", "people": 1, "cost": 150000 }
+    ],
+    "people": [
+      {
+        "staff_id": "STF-001",
+        "name": "Example Officer A",
+        "category": "Admin / Executive",
+        "cost_25_26": 200000,
+        "role": "CFO",
+        "notes": ""
+      },
+      {
+        "staff_id": "STF-002",
+        "name": "Example Officer B",
+        "category": "Finance",
+        "cost_25_26": 150000,
+        "role": "Accountant",
+        "notes": ""
+      }
+    ]
+  },
+  "baseline_capacity": {
+    "tithe_target": 5200000,
+    "target_staff_ratio": 0.75,
+    "max_staff_cost_at_target": 3900000,
+    "current_placeholder_staff_cost": 600000,
+    "headroom": 3300000,
+    "fte_headroom": 22.0,
+    "recommendation": "Can afford about 22.0 more FTE at the placeholder package, before governance/cash checks."
+  }
+}

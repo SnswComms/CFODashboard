@@ -1,0 +1,72 @@
+{
+  "generated_at": "2026-06-01T08:45:00+00:00",
+  "base": "https://myob.example.invalid/entity/Default/24.200.001",
+  "endpoints": {
+    "CashAccount": {
+      "status": 200,
+      "kind": "list",
+      "count_sample": 2,
+      "sample": [
+        { "CashAccountCD": "111200", "Description": "Example Bank Account (AUD)", "Balance": 100000 },
+        { "CashAccountCD": "111300", "Description": "Example Cash Management Facility (AUD)", "Balance": 250000 }
+      ]
+    },
+    "CashAccountDetails": { "status": 404, "body": "endpoint not found" },
+    "BankAccount": { "status": 404, "body": "endpoint not found" },
+    "BankAccounts": { "status": 404, "body": "endpoint not found" },
+    "Account": {
+      "status": 200,
+      "kind": "list",
+      "count_sample": 5,
+      "sample": [
+        { "AccountCD": "111100", "Description": "Example Cash on hand", "CashAccount": true, "Type": "Asset" },
+        { "AccountCD": "111500", "Descr": "Example Term deposits", "CurrentBalance": 50000, "CashAccount": true, "Type": "Asset" }
+      ]
+    },
+    "Subaccount": { "status": 200, "kind": "list", "count_sample": 3 },
+    "Branch": { "status": 200, "kind": "list", "count_sample": 2 },
+    "Company": { "status": 404, "body": "endpoint not found" },
+    "CashTransaction": { "status": 404, "body": "endpoint not found" },
+    "BankTransaction": { "status": 404, "body": "endpoint not found" },
+    "Payment": { "status": 200, "kind": "list", "count_sample": 5 },
+    "JournalTransaction": { "status": 200, "kind": "list", "count_sample": 5 },
+    "GeneralLedgerBalance": { "status": 404, "body": "endpoint not found" },
+    "GLBalance": { "status": 404, "body": "endpoint not found" },
+    "AccountByPeriod": { "status": 404, "body": "endpoint not found" },
+    "AccountHistory": { "status": 404, "body": "endpoint not found" },
+    "TrialBalance": { "status": 404, "body": "endpoint not found" },
+    "Ledger": { "status": 200, "kind": "list", "count_sample": 1 },
+    "FinancialPeriod": { "status": 200, "kind": "list", "count_sample": 12 }
+  },
+  "cash_account_candidates": [
+    {
+      "_endpoint": "CashAccount",
+      "CashAccountCD": "111200",
+      "Description": "Example Bank Account (AUD)",
+      "Balance": 100000,
+      "Active": true
+    },
+    {
+      "_endpoint": "CashAccount",
+      "CashAccountCD": "111300",
+      "Description": "Example Cash Management Facility (AUD)",
+      "Balance": 250000,
+      "Active": true
+    },
+    {
+      "_endpoint": "Account",
+      "AccountCD": "111100",
+      "Description": "Example Cash on hand",
+      "CashAccount": true,
+      "Type": "Asset"
+    },
+    {
+      "_endpoint": "Account",
+      "AccountCD": "111500",
+      "Descr": "Example Term deposits",
+      "CurrentBalance": 50000,
+      "CashAccount": true,
+      "Type": "Asset"
+    }
+  ]
+}

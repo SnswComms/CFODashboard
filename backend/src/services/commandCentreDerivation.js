@@ -1,0 +1,316 @@
+// Live MYOB GL derivation for the CFO Command Centre. Turns the read-only
+// live-gl cache (journal lines, already extracted GET-only from MYOB) into the
+// same payload shapes the synthetic constants encode. Budgets always come from
+// the board-approved constants (constants/approvedBudget.js); ONLY actuals
+// (spent / income / expense) come from the cache. No file reads, no network —
+// the service hands the parsed cache document in.
+
+const { APPROVED_TOTALS, PREFIX_TO_DEPT, DECISION_LANES } = require("../constants/approvedBudget");
+const {
+  FUNCTIONS_RAW,
+  DEPT_RAW,
+  LANES_RAW,
+  ENT_DEFS,
+  FUNCTION_DEPT_KEYS,
+  DEPT_ENTITY_MAP,
+  BRANCH_ENTITY_MAP,
+  OVERVIEW_KPIS,
+} = require("../constants/commandCentre");
+
+// LANES_RAW and DECISION_LANES agree on lane ids except the president lane.
+const LANE_DECISION_IDS = { president: "president_discretionary" };
+
+// Design KPI number style: $8.03M / $136K, negatives as ($139K).
+function fmtCompact(x) {
+  const abs = Math.abs(x);
+  const s = abs >= 1e6 ? "$" + (abs / 1e6).toFixed(2) + "M" : "$" + Math.round(abs / 1e3) + "K";
+  return x < 0 ? "(" + s + ")" : s;
+}
+
+// Inverse of the synthetic computeUsage: used_pct comes honestly from real
+// sums, but the over/tight/ok thresholds are the same contract §2 rules.
+function usageFrom(budget, spent) {
+  const used_pct = budget > 0 ? Math.round((spent / budget) * 100) : 0;
+  const remaining = budget - spent;
+  const status = remaining < 0 ? "over" : used_pct >= 85 ? "tight" : "ok";
+  return { used_pct, spent, remaining, status };
+}
+
+function classifyAccounts(accounts) {
+  const classes = new Map();
+  for (const account of accounts || []) {
+    const code = account.AccountCD ?? account.Account ?? account.AccountID ?? "";
+    // Some tenants put the semantic kind in Type (Expense/Income/Asset/...)
+    // and a bare numeric prefix in AccountClass — match against both.
+    const cls = [account.Type, account.AccountClass]
+      .filter((value) => value !== undefined && value !== null)
+      .map((value) => String(value).toUpperCase())
+      .join(" ");
+    if (code !== "") classes.set(String(code), cls);
+  }
+  return classes;
+}
+
+// Income accounts are credit-normal; lines on accounts with no known class are
+// treated as expense (the extractor's default sweep is expense lines), and
+// balance-sheet activity is skipped — it is not P&L actuals.
+function lineKind(cls) {
+  if (!cls) return "expense";
+  if (cls.includes("INCOME") || cls.includes("REVENUE") || cls.includes("SALES")) return "income";
+  if (cls.includes("EXPENSE")) return "expense";
+  return "skip";
+}
+
+// Department from the first MYOB subaccount segment/prefix (PREFIX_TO_DEPT).
+function deptForSubaccount(subaccount) {
+  const segment = String(subaccount || "").split(/[-./ ]/)[0].trim().toUpperCase();
+  return PREFIX_TO_DEPT[segment] || PREFIX_TO_DEPT[segment.slice(0, 3)] || null;
+}
+
+function monthOf(line) {
+  const fromPeriod = Number(String(line.period || "").slice(0, 2));
+  if (fromPeriod >= 1 && fromPeriod <= 12) return fromPeriod;
+  const date = new Date(String(line.date || ""));
+  return Number.isNaN(date.getTime()) ? null : date.getUTCMonth() + 1;
+}
+
+// One normalized record per usable journal line. Bill lines are deliberately
+// excluded — per the mapping notes, journals are the accounting actual source
+// and AP bill lines are evidence only. Post-dated journals (the tenant carries
+// accrual/recurring batches dated months ahead) are excluded so YTD sums stay
+// honest as-of the extract date.
+function normalizeLines(doc) {
+  const classes = classifyAccounts(doc.accounts);
+  const asOf = String(doc.generated_at ?? "").slice(0, 10);
+  const lines = [];
+  for (const raw of doc.journal_lines || []) {
+    if (asOf && raw.date && String(raw.date).slice(0, 10) > asOf) continue;
+    const kind = lineKind(classes.get(String(raw.account ?? "")));
+    if (kind === "skip") continue;
+    const debit = Number(raw.debit) || 0;
+    const credit = Number(raw.credit) || 0;
+    const netDebit =
+      raw.net_debit === undefined || raw.net_debit === null ? debit - credit : Number(raw.net_debit) || 0;
+    lines.push({
+      kind,
+      amount: kind === "income" ? -netDebit : netDebit,
+      dept: deptForSubaccount(raw.subaccount),
+      branch: String(raw.branch || "").toUpperCase(),
+      month: monthOf(raw),
+      text: [raw.account_description, raw.line_description, raw.header_description]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase(),
+    });
+  }
+  return lines;
+}
+
+// Lane actuals via the DECISION_LANES term contract: expense lines whose
+// department matches a function term and whose descriptions carry a detail
+// term (excluding the lane's exclude terms).
+function laneSpentFrom(lines, def) {
+  let sum = 0;
+  for (const line of lines) {
+    if (line.kind !== "expense" || !line.dept) continue;
+    if (!def.function_terms.some((term) => line.dept.includes(term))) continue;
+    if (def.exclude_terms.some((term) => line.text.includes(term))) continue;
+    if (!def.detail_terms.some((term) => line.text.includes(term))) continue;
+    sum += line.amount;
+  }
+  return Math.round(sum);
+}
+
+// Calendar-year elapsed % at the cache timestamp (the design constant 42 is
+// 31 May against a Jan–Dec FY2026).
+function periodFrom(generatedAt) {
+  const at = new Date(generatedAt ?? "");
+  if (Number.isNaN(at.getTime())) return { label: "FY2026 to date", elapsed_pct: 42 };
+  const year = at.getUTCFullYear();
+  const start = Date.UTC(year, 0, 1);
+  const end = Date.UTC(year + 1, 0, 1);
+  const elapsed_pct = Math.min(100, Math.max(0, Math.round(((at.getTime() - start) / (end - start)) * 100)));
+  return { label: "FY" + year + " to date", elapsed_pct };
+}
+
+function observationFrom(overs, tights) {
+  const clauses = [];
+  if (overs.length > 0) {
+    const names = overs.map((fn) => fn.name).join(" and ");
+    clauses.push(
+      names +
+        (overs.length === 1 ? " has" : " have") +
+        " already overrun " +
+        (overs.length === 1 ? "its" : "their") +
+        " full-year allocation",
+    );
+  }
+  for (const fn of tights) clauses.push(fn.name + " is " + fn.used_pct + "% committed");
+  if (clauses.length === 0) return "Every function sits at or under elapsed-year pace.";
+  const last = clauses.pop();
+  const joined = clauses.length > 0 ? clauses.join(", ") + ", and " + last : last;
+  return joined + ". Every other function still sits at or under elapsed-year pace.";
+}
+
+// doc: parsed live-gl cache; meta: the resolver's live-cache meta (kept on the
+// model so every getter can return it unchanged).
+function buildLiveModel(doc, meta) {
+  const lines = normalizeLines(doc);
+  const generated_at = meta.generated_at ?? doc.generated_at ?? null;
+
+  const deptSpent = new Map();
+  const entityAgg = new Map(ENT_DEFS.map((entity) => [entity.name, { income: 0, expense: 0 }]));
+  const monthly = { income: Array(12).fill(0), expense: Array(12).fill(0) };
+  let income = 0;
+  let expense = 0;
+  for (const line of lines) {
+    if (line.kind === "income") income += line.amount;
+    else expense += line.amount;
+    const entity = entityAgg.get(
+      DEPT_ENTITY_MAP[line.dept] || BRANCH_ENTITY_MAP[line.branch] || ENT_DEFS[0].name,
+    );
+    if (entity) entity[line.kind] += line.amount;
+    if (line.kind === "expense" && line.dept) {
+      deptSpent.set(line.dept, (deptSpent.get(line.dept) || 0) + line.amount);
+    }
+    if (line.month) monthly[line.kind][line.month - 1] += line.amount;
+  }
+  income = Math.round(income);
+  expense = Math.round(expense);
+  const totals = { income, expense, net: income - expense };
+
+  const functions = FUNCTIONS_RAW.map((fn) => {
+    const spent = Math.round(deptSpent.get(FUNCTION_DEPT_KEYS[fn.name]) || 0);
+    return { name: fn.name, budget: fn.budget, ...usageFrom(fn.budget, spent) };
+  });
+
+  const departments = DEPT_RAW.map((dept) => {
+    const spent = Math.round(deptSpent.get(FUNCTION_DEPT_KEYS[dept.name]) || 0);
+    const usage = usageFrom(dept.budget, spent);
+    // Line math uses the PARENT department's used_pct (contract §3).
+    const deptLines = dept.lines.map(([line, lineBudget]) => {
+      const lineSpent = Math.round((lineBudget * usage.used_pct) / 100);
+      return { line, budget: lineBudget, spent: lineSpent, remaining: lineBudget - lineSpent };
+    });
+    return { name: dept.name, budget: dept.budget, ...usage, lines: deptLines };
+  });
+
+  const entities = ENT_DEFS.map((entity) => {
+    const agg = entityAgg.get(entity.name);
+    const entityIncome = Math.round(agg.income);
+    const entityExpense = Math.round(agg.expense);
+    return {
+      name: entity.name,
+      scope: entity.scope,
+      income: entityIncome,
+      expense: entityExpense,
+      net: entityIncome - entityExpense,
+    };
+  });
+  const entityTotal = entities.reduce(
+    (acc, entity) => ({
+      income: acc.income + entity.income,
+      expense: acc.expense + entity.expense,
+      net: acc.net + entity.net,
+    }),
+    { income: 0, expense: 0, net: 0 },
+  );
+
+  const lanes = LANES_RAW.map((lane) => {
+    const def = DECISION_LANES.find((candidate) => candidate.id === (LANE_DECISION_IDS[lane.id] || lane.id));
+    return { ...lane, spent: def ? laneSpentFrom(lines, def) : lane.spent };
+  });
+
+  const overs = functions.filter((fn) => fn.status === "over");
+  const tights = functions.filter((fn) => fn.status === "tight");
+  const watchNames = [...overs, ...tights].map((fn) => fn.name);
+  const targetNote =
+    "Full-year target " + (APPROVED_TOTALS.net >= 0 ? "+" : "") + fmtCompact(APPROVED_TOTALS.net);
+
+  const opKpis = [
+    {
+      eyebrow: "Operating income · YTD",
+      value: fmtCompact(income),
+      note: Math.round((income / APPROVED_TOTALS.income) * 100) + "% of " + fmtCompact(APPROVED_TOTALS.income) + " approved",
+      tone: "neutral",
+    },
+    {
+      eyebrow: "Operating spend · YTD",
+      value: fmtCompact(expense),
+      note: Math.round((expense / APPROVED_TOTALS.expense) * 100) + "% of " + fmtCompact(APPROVED_TOTALS.expense) + " approved",
+      tone: "neutral",
+    },
+    {
+      eyebrow: "Operating net · YTD",
+      value: fmtCompact(totals.net),
+      note: targetNote,
+      tone: totals.net < 0 ? "bad" : "good",
+    },
+    {
+      eyebrow: "Functions on watch",
+      value: String(watchNames.length),
+      note: watchNames.join(" · ") || "None",
+      tone: watchNames.length > 0 ? "warn" : "good",
+    },
+  ];
+
+  const overviewKpis = [
+    opKpis[2],
+    OVERVIEW_KPIS[1], // Approved surplus · FY26 — board constants either way
+    {
+      eyebrow: "Functions over budget",
+      value: String(overs.length),
+      note: overs.map((fn) => fn.name).join(" · ") || "None",
+      tone: overs.length > 0 ? "warn" : "good",
+    },
+    { eyebrow: "Data health", value: "Live", note: "MYOB GL cache · " + String(generated_at ?? "").slice(0, 10), tone: "good" },
+  ];
+
+  const composition = [
+    { label: "Income", approved: APPROVED_TOTALS.income, spent: income, tone: "good" },
+    { label: "Expense", approved: APPROVED_TOTALS.expense, spent: expense, tone: "neutral" },
+  ];
+
+  // Cumulative monthly actuals for the overview trend chart (months past the
+  // latest activity stay null so the frontend can keep projecting).
+  const activeMonths = lines.map((line) => line.month).filter(Boolean);
+  const asOfMonth = activeMonths.length > 0 ? Math.max(...activeMonths) : null;
+  let runningIncome = 0;
+  let runningExpense = 0;
+  const trendMonths = [];
+  for (let month = 1; month <= 12; month++) {
+    runningIncome += monthly.income[month - 1];
+    runningExpense += monthly.expense[month - 1];
+    const active = asOfMonth !== null && month <= asOfMonth;
+    trendMonths.push({
+      month,
+      income: active ? Math.round(runningIncome) : null,
+      expense: active ? Math.round(runningExpense) : null,
+    });
+  }
+  const trend = { as_of_month: asOfMonth, months: trendMonths };
+
+  const freshnessEntry = { name: "MYOB live GL cache", status: "Current", tone: "good" };
+  const freshnessFullEntry = { ...freshnessEntry, note: "Extracted " + String(generated_at ?? "").slice(0, 10) };
+
+  return {
+    meta,
+    generated_at,
+    totals,
+    functions,
+    departments,
+    entities,
+    entityTotal,
+    lanes,
+    period: periodFrom(generated_at),
+    opKpis,
+    overviewKpis,
+    composition,
+    observation: observationFrom(overs, tights),
+    trend,
+    freshnessEntry,
+    freshnessFullEntry,
+  };
+}
+
+module.exports = { buildLiveModel, fmtCompact };

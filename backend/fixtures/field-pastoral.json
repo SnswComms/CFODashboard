@@ -1,0 +1,93 @@
+{
+  "generated_at": "2026-01-01T00:00:00",
+  "source": "synthetic",
+  "periods": {
+    "budget": "FY2026 approved FIELD budget control total (synthetic example)",
+    "payroll": "FY2025-26 payroll allocation extract (synthetic example)",
+    "history": "Historical FY2015-FY2024 field actuals not yet indexed in a repeatable parser",
+    "trial_balance": "August 2025 GL migration trial balance evidence only (synthetic example)"
+  },
+  "budget_2026": {
+    "total": 500000,
+    "spent": 460000,
+    "remaining": 40000,
+    "lines": [],
+    "source": "synthetic department budget dashboard data",
+    "period": "FY2026 approved budget (synthetic)",
+    "actual_period": "May 2026 actuals (synthetic)",
+    "status": "approved_pdf_control_total_from_department_dashboard"
+  },
+  "budget_workbook_detail": {
+    "total": 480000,
+    "rows": [
+      { "account": "701010", "subaccount": "FLD000", "description": "Example salaries", "budget": 300000 },
+      { "account": "702010", "subaccount": "FLD000", "description": "Example allowances", "budget": 120000 },
+      { "account": "703015", "subaccount": "FLD000", "description": "Example ministry expense", "budget": 60000 }
+    ],
+    "source": "synthetic budget workbook"
+  },
+  "budget_reconciliation": {
+    "approved_control_total": 500000,
+    "workbook_detail_total": 480000,
+    "difference": 20000,
+    "approved_source": "synthetic department budget dashboard data",
+    "detail_source": "synthetic budget workbook",
+    "status": "approved PDF control total is authoritative; workbook rows are detail support until reconciled"
+  },
+  "staff": {
+    "by_category": [
+      { "category": "Field / pastoral", "people": 3, "cost": 360000 },
+      { "category": "Admin / Executive", "people": 2, "cost": 260000 },
+      { "category": "Department director", "people": 2, "cost": 240000 },
+      { "category": "Finance", "people": 1, "cost": 110000 },
+      { "category": "Department support", "people": 1, "cost": 90000 },
+      { "category": "Other conference", "people": 1, "cost": 80000 },
+      { "category": "AAV - exclude for now", "people": 1, "cost": 70000 },
+      { "category": "School - exclude", "people": 1, "cost": 60000 }
+    ],
+    "field_people": [
+      { "staff_id": "S001", "name": "Example Pastor A", "match_name": "Example Pastor A", "match_score": "100", "job_or_area": "Example District North", "role": "Pastor", "notes": "", "category": "Field / pastoral", "cost_25_26": 130000 },
+      { "staff_id": "S002", "name": "Example Pastor B", "match_name": "Example Pastor B", "match_score": "100", "job_or_area": "Example District South", "role": "Pastor", "notes": "", "category": "Field / pastoral", "cost_25_26": 120000 },
+      { "staff_id": "S003", "name": "Example Pastor C", "match_name": "Example Pastor C", "match_score": "95", "job_or_area": "Example District West", "role": "Pastor", "notes": "", "category": "Field / pastoral", "cost_25_26": 110000 }
+    ],
+    "all_people": [
+      { "staff_id": "S004", "name": "Example Executive A", "match_name": "Example Executive A", "match_score": "100", "job_or_area": "Administration", "role": "Officer", "notes": "", "category": "Admin / Executive", "cost_25_26": 140000 },
+      { "staff_id": "S001", "name": "Example Pastor A", "match_name": "Example Pastor A", "match_score": "100", "job_or_area": "Example District North", "role": "Pastor", "notes": "", "category": "Field / pastoral", "cost_25_26": 130000 },
+      { "staff_id": "S005", "name": "Example Director A", "match_name": "Example Director A", "match_score": "100", "job_or_area": "Youth", "role": "Director", "notes": "", "category": "Department director", "cost_25_26": 125000 },
+      { "staff_id": "S002", "name": "Example Pastor B", "match_name": "Example Pastor B", "match_score": "100", "job_or_area": "Example District South", "role": "Pastor", "notes": "", "category": "Field / pastoral", "cost_25_26": 120000 },
+      { "staff_id": "S006", "name": "Example Executive B", "match_name": "Example Executive B", "match_score": "100", "job_or_area": "Secretariat", "role": "Officer", "notes": "", "category": "Admin / Executive", "cost_25_26": 120000 },
+      { "staff_id": "S007", "name": "Example Director B", "match_name": "Example Director B", "match_score": "100", "job_or_area": "Education", "role": "Director", "notes": "", "category": "Department director", "cost_25_26": 115000 },
+      { "staff_id": "S003", "name": "Example Pastor C", "match_name": "Example Pastor C", "match_score": "95", "job_or_area": "Example District West", "role": "Pastor", "notes": "", "category": "Field / pastoral", "cost_25_26": 110000 },
+      { "staff_id": "S008", "name": "Example Accountant A", "match_name": "Example Accountant A", "match_score": "100", "job_or_area": "Finance", "role": "Accountant", "notes": "", "category": "Finance", "cost_25_26": 110000 },
+      { "staff_id": "S009", "name": "Example Assistant A", "match_name": "Example Assistant A", "match_score": "100", "job_or_area": "Department support", "role": "Assistant", "notes": "", "category": "Department support", "cost_25_26": 90000 },
+      { "staff_id": "S010", "name": "Example Worker A", "match_name": "Example Worker A", "match_score": "90", "job_or_area": "Other conference", "role": "Worker", "notes": "", "category": "Other conference", "cost_25_26": 80000 },
+      { "staff_id": "S011", "name": "Example Worker B", "match_name": "Example Worker B", "match_score": "90", "job_or_area": "Campground", "role": "Worker", "notes": "", "category": "AAV - exclude for now", "cost_25_26": 70000 },
+      { "staff_id": "S012", "name": "Example Teacher A", "match_name": "Example Teacher A", "match_score": "90", "job_or_area": "Example school", "role": "Teacher", "notes": "", "category": "School - exclude", "cost_25_26": 60000 }
+    ],
+    "direct_conference_total": 1140000,
+    "source": "synthetic staff allocation extract"
+  },
+  "historical_actual_trend": [],
+  "history_status": {
+    "status": "not yet indexed",
+    "confidence": "No chart shown until historical workbook/SUN parsing is repeatable and source rows are attributed.",
+    "next_action": "Build a local historical field-staff-cost index with source workbook, account, function, FY, actual, and confidence columns."
+  },
+  "david": {
+    "david_expense_rows": [
+      { "account": "703015", "description": "Example funded field worker expense", "type": "Expense", "subaccount": "FLD000", "amount": 50000, "function": "FIELD", "raw": "synthetic trial balance row" }
+    ],
+    "funding_rows": [
+      { "account": "250010", "description": "Example designated funding trust", "type": "Liability", "subaccount": "TR00000", "amount": 50000, "raw": "synthetic trial balance row" }
+    ],
+    "david_expense_total": 50000,
+    "funding_liability_balance": 50000,
+    "source": "synthetic trial balance workbook",
+    "status": "probable funding lane; not yet proof of salary offset"
+  },
+  "sources": [
+    { "label": "Source map", "path": "synthetic://indexes/field-pastoral-budget-staffing-sources.md", "use": "Routing and source attribution" },
+    { "label": "2026 approved FIELD budget control", "path": "synthetic://dashboards/department-budget-dashboard-data.json", "use": "Authoritative approved FY2026 FIELD budget control total" },
+    { "label": "Staff payroll allocation extract", "path": "synthetic://payroll/current_25_26_staff_allocation_with_overrides.csv", "use": "FY2025-26 payroll people/cost by role category" }
+  ]
+}

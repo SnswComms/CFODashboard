@@ -1,0 +1,54 @@
+{
+  "generated_at": "2026-01-01T00:00:00",
+  "targets": [
+    {
+      "name": "Example Pastor A",
+      "district": "Example District North",
+      "assignment": "District pastor",
+      "churches": "Example Church East; Example Church West",
+      "ministry_years_total": 10,
+      "snsw_years": 5,
+      "code": "PAS-001",
+      "email": "example.pastor.a@example.org",
+      "email_name": "Example Pastor A",
+      "ftb_balance": 1000,
+      "ftb_ytd_credit": 500,
+      "ftb_ytd_debit": 250,
+      "ftb_as_of": "2026-06-30",
+      "pde_allowance_2026": 1800.0,
+      "evangelist_extra_2026": 0.0,
+      "first_year_intern_extra_2026": 0.0,
+      "source_name": "Pastor A, Example",
+      "book_budget_2025": 600,
+      "first_year_intern_2025": 0,
+      "professional_dev_2025": 1200,
+      "book_spent_2025": 400,
+      "book_balance_2025": 200
+    },
+    {
+      "name": "Example Pastor B",
+      "district": "Example District South",
+      "assignment": "Evangelist",
+      "churches": "Example Church South",
+      "ministry_years_total": 1,
+      "snsw_years": 1,
+      "code": "PAS-002",
+      "email": null,
+      "email_name": null,
+      "ftb_balance": null,
+      "ftb_ytd_credit": null,
+      "ftb_ytd_debit": null,
+      "ftb_as_of": null,
+      "ftb_error": "synthetic: benefits tracker unavailable",
+      "pde_allowance_2026": 1800.0,
+      "evangelist_extra_2026": 900.0,
+      "first_year_intern_extra_2026": 900.0
+    }
+  ],
+  "sources": {
+    "pathways": "synthetic://payroll/pastors-pathways.xlsx",
+    "pde_policy": "synthetic://payroll/professional-development-and-equipment-allowance.docx",
+    "book_2025": "synthetic://payroll/book-and-equipment-ministers.xlsx",
+    "morpheus": "synthetic://morpheus"
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "generated_at": "2026-01-01T00:00:00+00:00",
+  "built_at": "2026-01-01T00:00:00+00:00",
+  "date_first": "2018-01-01 09:00:00",
+  "date_last": "2026-01-01 09:00:00",
+  "mail_count": 50000,
+  "folders": 20,
+  "attachment_records": 30000,
+  "attachment_text_ok": 25000,
+  "attachment_text_failed": 500,
+  "messages_with_attachment_text": 18000,
+  "policy_sources": 1200,
+  "policy_failures": 10,
+  "policy_built_at": "2026-01-01T00:00:00+00:00",
+  "top_senders": [
+    { "sender": "Example Sender A <sender.a@example.org>", "count": 2000, "first": "2018-02-01 09:00:00", "last": "2025-12-01 09:00:00" },
+    { "sender": "Example Sender B <sender.b@example.org>", "count": 1500, "first": "2019-03-01 09:00:00", "last": "2025-11-01 09:00:00" },
+    { "sender": "Example Sender C <sender.c@example.net>", "count": 1000, "first": "2020-04-01 09:00:00", "last": "2025-10-01 09:00:00" }
+  ],
+  "top_domains": [
+    { "domain": "example.org", "count": 12000 },
+    { "domain": "example.net", "count": 8000 },
+    { "domain": "example.com", "count": 5000 }
+  ],
+  "topics": [
+    { "path": "example-budget-topic.md", "title": "Example budget topic", "count": 400 },
+    { "path": "example-audit-topic.md", "title": "Example audit topic", "count": 250 }
+  ],
+  "open_loop_candidates": [
+    { "title": "Example open loop A", "note": "synthetic://email-knowledge/04-open-loops/example-a.md", "raw": "synthetic://email-knowledge/_raw/example-a.json" },
+    { "title": "Example open loop B", "note": "synthetic://email-knowledge/04-open-loops/example-b.md", "raw": "synthetic://email-knowledge/_raw/example-b.json" }
+  ],
+  "paths": {
+    "vault": "synthetic://email-knowledge",
+    "smart_index": "synthetic://email-knowledge/_state/smart_mail_index.sqlite",
+    "dashboard_md": "synthetic://email-knowledge/00-dashboard/Mailbox Intelligence Dashboard.md",
+    "answer_cli": "synthetic://tools/outlook-reader/mail_answer_workflow.py",
+    "lookup_cli": "synthetic://tools/outlook-reader/smart_mail_lookup.py",
+    "policy_root": "synthetic://policy-knowledge",
+    "policy_index": "synthetic://policy-knowledge/_state/policy_index.sqlite",
+    "policy_lookup_cli": "synthetic://tools/outlook-reader/policy_lookup.py",
+    "investigations_layer": "synthetic://dashboards/constituency-investigations-layer.html",
+    "dashboard_html": "synthetic://dashboards/email-intelligence-dashboard.html"
+  }
+}

@@ -1,0 +1,508 @@
+{
+  "generated_at": "2026-06-01T09:00:00",
+  "budget": {
+    "source": "synthetic://final-budget-2026.pdf",
+    "approval_email_note": "synthetic://approval-email-note.md",
+    "modified": null,
+    "row_count": null,
+    "basis_note": "Approved annual totals from Final budget 2026.pdf. Period 05 and Jan-May references are elapsed-year pace checks, not monthly-budget precision.",
+    "annual": {
+      "income": 8032932,
+      "expense": 7896544,
+      "net": 136388
+    },
+    "period_05": {
+      "income": 669411,
+      "expense": 658045.3333333334,
+      "net": 11365.666666666628
+    },
+    "jan_may": {
+      "income": 3347055,
+      "expense": 3290226.6666666665,
+      "net": 56828.33333333349
+    },
+    "top_expense_budget": [
+      [
+        "Field Expense",
+        3177120
+      ],
+      [
+        "Adventist Alpine Village Expenditure",
+        2258427
+      ],
+      [
+        "Administration & General Expenses",
+        1549196
+      ],
+      [
+        "Departmental Activities",
+        554823
+      ],
+      [
+        "Annual Convention Expense",
+        193620
+      ],
+      [
+        "Faith FM Expenses",
+        82557
+      ],
+      [
+        "Evangelism / Pastoral & Lay Outreach",
+        62000
+      ],
+      [
+        "Conference House Expenses",
+        11300
+      ],
+      [
+        "Miscellaneous Expense",
+        7500
+      ],
+      [
+        "Appropriations Paid",
+        3000
+      ]
+    ],
+    "top_income_budget": [
+      [
+        "Tithe available for use",
+        4086524
+      ],
+      [
+        "Adventist Alpine Village Income",
+        2996300
+      ],
+      [
+        "Education System Contribution",
+        511608
+      ],
+      [
+        "Appropriations & Interest",
+        202800
+      ],
+      [
+        "Annual Convention Income",
+        87500
+      ],
+      [
+        "Bible Worker Fund",
+        50000
+      ],
+      [
+        "Sundry Income",
+        35000
+      ],
+      [
+        "Conference House Rents",
+        20800
+      ]
+    ]
+  },
+  "summary": {
+    "source": "synthetic://operating-statement-graphs.xlsx",
+    "modified": null,
+    "actual": {
+      "conference_income": 2100000,
+      "conference_expense": 2300000,
+      "conference_net": -200000,
+      "aav_income": 1200000,
+      "aav_expense": 950000,
+      "aav_net": 250000,
+      "overall_income": 3300000,
+      "overall_expense": 3250000,
+      "overall_net": 50000
+    },
+    "cash_rows": [
+      {
+        "account": "Example Operating Account",
+        "type": "At call",
+        "may": 1500000
+      },
+      {
+        "account": "Example Term Deposit",
+        "type": "Term deposit",
+        "may": 2500000
+      },
+      {
+        "account": "Example CMF Account",
+        "type": "At call",
+        "may": 750000
+      }
+    ]
+  },
+  "detail": {
+    "source": "synthetic://velixo-operating-report.xlsx",
+    "modified": null,
+    "functions": [
+      {
+        "name": "FIELD",
+        "budget": 0,
+        "actual": 0,
+        "income_budget": 0,
+        "income_actual": 0,
+        "expense_budget": 3177120,
+        "expense_actual": 1270848,
+        "line_count": 1,
+        "source_expense_budget": 3177120,
+        "expense_remaining": 1906272,
+        "used_pct": 40
+      },
+      {
+        "name": "ADVENTIST ALPINE VILLAGE",
+        "budget": 0,
+        "actual": 0,
+        "income_budget": 0,
+        "income_actual": 0,
+        "expense_budget": 2258427,
+        "expense_actual": 903371,
+        "line_count": 1,
+        "source_expense_budget": 2258427,
+        "expense_remaining": 1355056,
+        "used_pct": 40.00000885572126
+      },
+      {
+        "name": "ADMINISTRATION",
+        "budget": 0,
+        "actual": 0,
+        "income_budget": 0,
+        "income_actual": 0,
+        "expense_budget": 1549196,
+        "expense_actual": 619678,
+        "line_count": 1,
+        "source_expense_budget": 1549196,
+        "expense_remaining": 929518,
+        "used_pct": 39.999974180155384
+      },
+      {
+        "name": "YOUTH MINISTRY",
+        "budget": 0,
+        "actual": 0,
+        "income_budget": 0,
+        "income_actual": 0,
+        "expense_budget": 274288,
+        "expense_actual": 109715,
+        "line_count": 1,
+        "source_expense_budget": 274288,
+        "expense_remaining": 164573,
+        "used_pct": 39.99992708394097
+      },
+      {
+        "name": "BIG CAMP",
+        "budget": 0,
+        "actual": 0,
+        "income_budget": 0,
+        "income_actual": 0,
+        "expense_budget": 193620,
+        "expense_actual": 77448,
+        "line_count": 1,
+        "source_expense_budget": 193620,
+        "expense_remaining": 116172,
+        "used_pct": 40
+      },
+      {
+        "name": "MINISTERIAL",
+        "budget": 0,
+        "actual": 0,
+        "income_budget": 0,
+        "income_actual": 0,
+        "expense_budget": 128586,
+        "expense_actual": 51434,
+        "line_count": 1,
+        "source_expense_budget": 128586,
+        "expense_remaining": 77152,
+        "used_pct": 39.99968892414415
+      },
+      {
+        "name": "COMMUNICATIONS",
+        "budget": 0,
+        "actual": 0,
+        "income_budget": 0,
+        "income_actual": 0,
+        "expense_budget": 99200,
+        "expense_actual": 39680,
+        "line_count": 1,
+        "source_expense_budget": 99200,
+        "expense_remaining": 59520,
+        "used_pct": 40
+      },
+      {
+        "name": "FAITH FM ADMINISTRATION",
+        "budget": 0,
+        "actual": 0,
+        "income_budget": 0,
+        "income_actual": 0,
+        "expense_budget": 82557,
+        "expense_actual": 33023,
+        "line_count": 1,
+        "source_expense_budget": 82557,
+        "expense_remaining": 49534,
+        "used_pct": 40.00024225686495
+      },
+      {
+        "name": "EVANGELISM",
+        "budget": 0,
+        "actual": 0,
+        "income_budget": 0,
+        "income_actual": 0,
+        "expense_budget": 62000,
+        "expense_actual": 68000,
+        "line_count": 1,
+        "source_expense_budget": 62000,
+        "expense_remaining": -6000,
+        "used_pct": 109.6774193548387
+      },
+      {
+        "name": "PERSONAL MINISTRIES",
+        "budget": 0,
+        "actual": 0,
+        "income_budget": 0,
+        "income_actual": 0,
+        "expense_budget": 52750,
+        "expense_actual": 21100,
+        "line_count": 1,
+        "source_expense_budget": 52750,
+        "expense_remaining": 31650,
+        "used_pct": 40
+      },
+      {
+        "name": "PROPERTIES",
+        "budget": 0,
+        "actual": 0,
+        "income_budget": 0,
+        "income_actual": 0,
+        "expense_budget": 11300,
+        "expense_actual": 10170,
+        "line_count": 1,
+        "source_expense_budget": 11300,
+        "expense_remaining": 1130,
+        "used_pct": 90
+      },
+      {
+        "name": "OTHER OPERATIONS",
+        "budget": 0,
+        "actual": 0,
+        "income_budget": 0,
+        "income_actual": 0,
+        "expense_budget": 7500,
+        "expense_actual": 3000,
+        "line_count": 1,
+        "source_expense_budget": 7500,
+        "expense_remaining": 4500,
+        "used_pct": 40
+      }
+    ],
+    "lines": [
+      {
+        "function": "EVANGELISM",
+        "line": "Pastoral & Lay Outreach",
+        "budget": -62000,
+        "actual": -68000,
+        "variance": 6000,
+        "is_income": false,
+        "is_expense": true
+      },
+      {
+        "function": "ADMINISTRATION",
+        "line": "President Discretionary Expenses",
+        "budget": -20000,
+        "actual": -15000,
+        "variance": -5000,
+        "is_income": false,
+        "is_expense": true
+      },
+      {
+        "function": "FAITH FM ADMINISTRATION",
+        "line": "Faith FM fixed costs",
+        "budget": -72557,
+        "actual": -30000,
+        "variance": -42557,
+        "is_income": false,
+        "is_expense": true
+      },
+      {
+        "function": "YOUTH MINISTRY",
+        "line": "APS 10 Youth & Family Life",
+        "budget": -274288,
+        "actual": -100000,
+        "variance": -174288,
+        "is_income": false,
+        "is_expense": true
+      },
+      {
+        "function": "ADVENTIST ALPINE VILLAGE",
+        "line": "Adventist Alpine Village Income",
+        "budget": 2996300,
+        "actual": 1200000,
+        "variance": -1796300,
+        "is_income": true,
+        "is_expense": false
+      }
+    ]
+  },
+  "decision_cards": [
+    {
+      "id": "evangelism",
+      "title": "Evangelism request",
+      "question": "An evangelism budget request came in. Can we afford it?",
+      "function_terms": [
+        "EVANGELISM"
+      ],
+      "detail_terms": [
+        "evangelism",
+        "bible worker",
+        "outreach",
+        "atsim field evangelism"
+      ],
+      "exclude_terms": [
+        "income"
+      ],
+      "default_request": 5000,
+      "owner_hint": "Evangelism / outreach lane",
+      "budget": 62000,
+      "actual": 68000,
+      "remaining": -6000,
+      "used_pct": 109.6774193548387,
+      "example_request": 5000,
+      "after_request": -11000,
+      "status": "Not affordable in lane",
+      "status_class": "bad",
+      "advice": "A $5,000 request would exceed the visible lane by $11,000.",
+      "matched_lines": [
+        {
+          "function": "EVANGELISM",
+          "line": "Pastoral & Lay Outreach",
+          "budget": -62000,
+          "actual": -68000,
+          "variance": 6000,
+          "is_income": false,
+          "is_expense": true
+        }
+      ],
+      "match_count": 1
+    },
+    {
+      "id": "president_discretionary",
+      "title": "President discretionary",
+      "question": "Justin was invited to the USA. Can the President afford it?",
+      "function_terms": [
+        "ADMINISTRATION"
+      ],
+      "detail_terms": [
+        "president"
+      ],
+      "exclude_terms": [
+        "income"
+      ],
+      "default_request": 3500,
+      "owner_hint": "President / administration discretionary lane",
+      "budget": 20000,
+      "actual": 15000,
+      "remaining": 5000,
+      "used_pct": 75,
+      "example_request": 3500,
+      "after_request": 1500,
+      "status": "Possible, but tight",
+      "status_class": "warn",
+      "advice": "A $3,500 request fits but leaves only $1,500.",
+      "matched_lines": [
+        {
+          "function": "ADMINISTRATION",
+          "line": "President Discretionary Expenses",
+          "budget": -20000,
+          "actual": -15000,
+          "variance": -5000,
+          "is_income": false,
+          "is_expense": true
+        }
+      ],
+      "match_count": 1
+    },
+    {
+      "id": "faith_fm",
+      "title": "Faith FM / studio equipment",
+      "question": "Faith FM needs microphones. Can we afford it?",
+      "function_terms": [
+        "FAITH FM",
+        "EVANGELISM"
+      ],
+      "detail_terms": [
+        "faith fm",
+        "radio",
+        "canberra radio station",
+        "media"
+      ],
+      "exclude_terms": [
+        "income",
+        "sale of goods"
+      ],
+      "default_request": 2500,
+      "owner_hint": "Faith FM / radio ministry lane",
+      "budget": 82557,
+      "actual": 30000,
+      "remaining": 52557,
+      "used_pct": 36.338529743086596,
+      "example_request": 2500,
+      "after_request": 50057,
+      "status": "Likely affordable",
+      "status_class": "good",
+      "advice": "A $2,500 request still leaves about $50,057.",
+      "matched_lines": [
+        {
+          "function": "FAITH FM ADMINISTRATION",
+          "line": "Faith FM fixed costs",
+          "budget": -72557,
+          "actual": -30000,
+          "variance": -42557,
+          "is_income": false,
+          "is_expense": true
+        }
+      ],
+      "match_count": 1
+    },
+    {
+      "id": "youth",
+      "title": "Youth ministry",
+      "question": "Can Youth absorb this request?",
+      "function_terms": [
+        "YOUTH"
+      ],
+      "detail_terms": [
+        "youth"
+      ],
+      "exclude_terms": [
+        "income"
+      ],
+      "default_request": 3000,
+      "owner_hint": "Youth ministry lane",
+      "budget": 274288,
+      "actual": 100000,
+      "remaining": 174288,
+      "used_pct": 36.458029516420694,
+      "example_request": 3000,
+      "after_request": 171288,
+      "status": "Likely affordable",
+      "status_class": "good",
+      "advice": "A $3,000 request still leaves about $171,288.",
+      "matched_lines": [
+        {
+          "function": "YOUTH MINISTRY",
+          "line": "APS 10 Youth & Family Life",
+          "budget": -274288,
+          "actual": -100000,
+          "variance": -174288,
+          "is_income": false,
+          "is_expense": true
+        }
+      ],
+      "match_count": 1
+    }
+  ],
+  "health": {
+    "generated_at": "2026-06-01T09:00:00",
+    "status": "WARN",
+    "warnings": [
+      "Synthetic fixture data — figures are illustrative, not real finance data."
+    ],
+    "errors": []
+  }
+}

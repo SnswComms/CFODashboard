@@ -1,0 +1,86 @@
+{
+  "generated_at": "2026-06-01T00:00:00+00:00",
+  "source": "Synthetic MYOB broad read-only cache fixture (fake entities, round numbers)",
+  "base_endpoint_family": "Default/20.200.001",
+  "endpoints": {
+    "Account": {
+      "ok": true,
+      "status": 200,
+      "count": 3,
+      "rows": [
+        { "AccountCD": "703430", "Description": "Local church evangelism", "AccountClass": "EXPENSE", "Type": "Expense", "Active": true },
+        { "AccountCD": "703100", "Description": "Catering", "AccountClass": "EXPENSE", "Type": "Expense", "Active": true },
+        { "AccountCD": "101000", "Description": "Example operating cash", "AccountClass": "CASHASSET", "Type": "Asset", "Active": false }
+      ]
+    },
+    "Customer": {
+      "ok": true,
+      "status": 200,
+      "count": 2,
+      "rows": [
+        { "CustomerID": "C-0001", "CustomerName": "Example Customer A", "Status": "Active" },
+        { "AccountRef": "C-0002", "AccountName": "Example Customer B", "Active": true }
+      ]
+    },
+    "Vendor": {
+      "ok": true,
+      "status": 200,
+      "count": 2,
+      "rows": [
+        { "VendorID": "V-0001", "VendorName": "Example Vendor A", "APAccount": "201000", "Status": "Active" },
+        { "AccountRef": "V-0002", "AccountName": "Example Vendor B", "APAccount": "201000", "Active": true }
+      ]
+    },
+    "Bill": {
+      "ok": true,
+      "status": 200,
+      "count": 2,
+      "rows": [
+        { "Date": "2025-07-10T00:00:00", "ReferenceNbr": "BILL-0001", "Vendor": "Example Vendor A", "BranchID": "MAIN", "Description": "Example catering bill", "Amount": 500, "Balance": 0 },
+        { "Date": "2025-08-02T00:00:00", "ReferenceNbr": "BILL-0002", "Vendor": "Example Vendor B", "BranchID": "MAIN", "Description": "Example venue bill", "Amount": 250, "Balance": 250 }
+      ]
+    },
+    "Invoice": {
+      "ok": true,
+      "status": 200,
+      "count": 1,
+      "rows": [
+        { "Date": "2025-07-15T00:00:00", "ReferenceNbr": "INV-0001", "Customer": "Example Customer A", "BranchID": "MAIN", "Description": "Example invoice", "Amount": 1200, "Balance": 600 }
+      ]
+    },
+    "Payment": {
+      "ok": true,
+      "status": 200,
+      "count": 1,
+      "rows": [
+        { "ReferenceNbr": "PAY-0001", "PaymentAmount": 500, "BranchID": "MAIN", "Description": "Example payment" }
+      ]
+    },
+    "JournalTransaction_since_2025_07_01_sample": {
+      "ok": true,
+      "status": 200,
+      "count": 2,
+      "rows": [
+        {
+          "TransactionDate": "2025-07-20T00:00:00",
+          "BatchNbr": "GJ-0001",
+          "BranchID": "MAIN",
+          "Description": "Example journal one",
+          "Details": [
+            { "Account": "703430", "DebitAmount": 100, "CreditAmount": 0, "Subaccount": "000-000", "Project": "X", "TransactionDescription": "Evangelism supplies" },
+            { "AccountID": "703100", "DebitAmt": 60, "CreditAmt": 0, "Subaccount": "000-000", "Project": "X", "TransactionDescription": "Catering supplies" }
+          ]
+        },
+        {
+          "TransactionDate": "2025-08-05T00:00:00",
+          "BatchNbr": "GJ-0002",
+          "Branch": "SOUTH",
+          "Description": "Example journal two",
+          "Details": [
+            { "Account": "703430", "DebitAmount": 0, "CreditAmount": 40, "Subaccount": "000-000", "Project": "", "TransactionDescription": "Evangelism refund" }
+          ]
+        }
+      ]
+    }
+  }
+}

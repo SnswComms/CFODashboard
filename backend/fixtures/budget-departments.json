@@ -1,0 +1,438 @@
+{
+  "generated_at": "2026-06-01T09:00:00",
+  "source": "Approved FY2026 budget constants (synthetic fixture)",
+  "source_modified": null,
+  "period_context": {
+    "budget_year": "2026",
+    "budget_period_label": "FY2026 approved annual budget — Final budget 2026.pdf, presented to Board 15 Feb 2026",
+    "actual_period_label": "May 2026 (synthetic fixture)",
+    "summary_period_label": "May 2026 operating summary",
+    "as_of_date": null,
+    "budget_source_modified": null,
+    "actual_source_modified": null,
+    "summary_source_modified": null,
+    "period_note": "Synthetic fixture built from the approved FY2026 budget constants with no actuals indexed. Spend is zero by construction; refresh live data sources for decisions."
+  },
+  "departments": [
+    {
+      "name": "FIELD",
+      "budget": 3177120,
+      "spent": 0,
+      "remaining": 3177120,
+      "used_pct": null,
+      "status": "ok",
+      "income_budget": 0,
+      "income_actual": 0,
+      "lines": [
+        {
+          "line": "Wages Taxable",
+          "budget": 1064871,
+          "spent": 0,
+          "remaining": 1064871
+        },
+        {
+          "line": "Fringe Benefits Budget",
+          "budget": 816423,
+          "spent": 0,
+          "remaining": 816423
+        },
+        {
+          "line": "Travel & Motor Vehicle",
+          "budget": 481083,
+          "spent": 0,
+          "remaining": 481083
+        },
+        {
+          "line": "Superannuation - ACAST",
+          "budget": 255104,
+          "spent": 0,
+          "remaining": 255104
+        },
+        {
+          "line": "Tithe Expense",
+          "budget": 234400,
+          "spent": 0,
+          "remaining": 234400
+        },
+        {
+          "line": "Removal",
+          "budget": 70000,
+          "spent": 0,
+          "remaining": 70000
+        },
+        {
+          "line": "Book & Equipment Subsidy",
+          "budget": 56104,
+          "spent": 0,
+          "remaining": 56104
+        },
+        {
+          "line": "LSL",
+          "budget": 48567,
+          "spent": 0,
+          "remaining": 48567
+        },
+        {
+          "line": "Professional Development",
+          "budget": 45000,
+          "spent": 0,
+          "remaining": 45000
+        },
+        {
+          "line": "ADSAFE Contributions",
+          "budget": 38767,
+          "spent": 0,
+          "remaining": 38767
+        },
+        {
+          "line": "Workers Compensation",
+          "budget": 35521,
+          "spent": 0,
+          "remaining": 35521
+        },
+        {
+          "line": "Telephone",
+          "budget": 22080,
+          "spent": 0,
+          "remaining": 22080
+        },
+        {
+          "line": "Field Exp",
+          "budget": 6200,
+          "spent": 0,
+          "remaining": 6200
+        },
+        {
+          "line": "Student Fees Discount",
+          "budget": 3000,
+          "spent": 0,
+          "remaining": 3000
+        }
+      ]
+    },
+    {
+      "name": "ADVENTIST ALPINE VILLAGE",
+      "budget": 2258427,
+      "spent": 0,
+      "remaining": 2258427,
+      "used_pct": null,
+      "status": "ok",
+      "income_budget": 0,
+      "income_actual": 0,
+      "lines": [
+        {
+          "line": "Adventist Alpine Village Expenditure",
+          "budget": 2258427,
+          "spent": 0,
+          "remaining": 2258427
+        }
+      ]
+    },
+    {
+      "name": "ADMINISTRATION",
+      "budget": 1549196,
+      "spent": 0,
+      "remaining": 1549196,
+      "used_pct": null,
+      "status": "ok",
+      "income_budget": 0,
+      "income_actual": 0,
+      "lines": [
+        {
+          "line": "Fixed Expenses total",
+          "budget": 996396,
+          "spent": 0,
+          "remaining": 996396
+        },
+        {
+          "line": "Accounting Fees/Overseas services",
+          "budget": 146500,
+          "spent": 0,
+          "remaining": 146500
+        },
+        {
+          "line": "Technology Expense/Software",
+          "budget": 142000,
+          "spent": 0,
+          "remaining": 142000
+        },
+        {
+          "line": "Travel Expense",
+          "budget": 26600,
+          "spent": 0,
+          "remaining": 26600
+        },
+        {
+          "line": "President Discretionary Expenses",
+          "budget": 20000,
+          "spent": 0,
+          "remaining": 20000
+        },
+        {
+          "line": "Property Usage",
+          "budget": 20000,
+          "spent": 0,
+          "remaining": 20000
+        },
+        {
+          "line": "Depreciation",
+          "budget": 15000,
+          "spent": 0,
+          "remaining": 15000
+        },
+        {
+          "line": "General Expense",
+          "budget": 14200,
+          "spent": 0,
+          "remaining": 14200
+        },
+        {
+          "line": "Legal Expenses",
+          "budget": 12000,
+          "spent": 0,
+          "remaining": 12000
+        },
+        {
+          "line": "Auditing Expense",
+          "budget": 10748,
+          "spent": 0,
+          "remaining": 10748
+        },
+        {
+          "line": "Cleaning & Garden",
+          "budget": 9360,
+          "spent": 0,
+          "remaining": 9360
+        },
+        {
+          "line": "Office Building Maintenance",
+          "budget": 4000,
+          "spent": 0,
+          "remaining": 4000
+        },
+        {
+          "line": "Equipment R & M",
+          "budget": 2500,
+          "spent": 0,
+          "remaining": 2500
+        },
+        {
+          "line": "Professional Development",
+          "budget": 2500,
+          "spent": 0,
+          "remaining": 2500
+        },
+        {
+          "line": "Church Supplies",
+          "budget": 1500,
+          "spent": 0,
+          "remaining": 1500
+        },
+        {
+          "line": "Stationery",
+          "budget": 1500,
+          "spent": 0,
+          "remaining": 1500
+        },
+        {
+          "line": "Telephone",
+          "budget": 1500,
+          "spent": 0,
+          "remaining": 1500
+        },
+        {
+          "line": "Postage & Freight",
+          "budget": 1000,
+          "spent": 0,
+          "remaining": 1000
+        },
+        {
+          "line": "Student Fees Discount",
+          "budget": 550,
+          "spent": 0,
+          "remaining": 550
+        },
+        {
+          "line": "Trailer Expense",
+          "budget": 400,
+          "spent": 0,
+          "remaining": 400
+        }
+      ]
+    },
+    {
+      "name": "YOUTH MINISTRY",
+      "budget": 274288,
+      "spent": 0,
+      "remaining": 274288,
+      "used_pct": null,
+      "status": "ok",
+      "income_budget": 0,
+      "income_actual": 0,
+      "lines": [
+        {
+          "line": "APS 10 Youth & Family Life",
+          "budget": 274288,
+          "spent": 0,
+          "remaining": 274288
+        }
+      ]
+    },
+    {
+      "name": "BIG CAMP",
+      "budget": 193620,
+      "spent": 0,
+      "remaining": 193620,
+      "used_pct": null,
+      "status": "ok",
+      "income_budget": 0,
+      "income_actual": 0,
+      "lines": [
+        {
+          "line": "Annual Convention Expense",
+          "budget": 193620,
+          "spent": 0,
+          "remaining": 193620
+        }
+      ]
+    },
+    {
+      "name": "MINISTERIAL",
+      "budget": 128586,
+      "spent": 0,
+      "remaining": 128586,
+      "used_pct": null,
+      "status": "ok",
+      "income_budget": 0,
+      "income_actual": 0,
+      "lines": [
+        {
+          "line": "APS 7 Ministerial Department",
+          "budget": 128586,
+          "spent": 0,
+          "remaining": 128586
+        }
+      ]
+    },
+    {
+      "name": "COMMUNICATIONS",
+      "budget": 99200,
+      "spent": 0,
+      "remaining": 99200,
+      "used_pct": null,
+      "status": "ok",
+      "income_budget": 0,
+      "income_actual": 0,
+      "lines": [
+        {
+          "line": "APS 3 Communications",
+          "budget": 99200,
+          "spent": 0,
+          "remaining": 99200
+        }
+      ]
+    },
+    {
+      "name": "FAITH FM ADMINISTRATION",
+      "budget": 82557,
+      "spent": 0,
+      "remaining": 82557,
+      "used_pct": null,
+      "status": "ok",
+      "income_budget": 0,
+      "income_actual": 0,
+      "lines": [
+        {
+          "line": "Faith FM fixed costs",
+          "budget": 72557,
+          "spent": 0,
+          "remaining": 72557
+        },
+        {
+          "line": "Faith FM variable costs",
+          "budget": 10000,
+          "spent": 0,
+          "remaining": 10000
+        }
+      ]
+    },
+    {
+      "name": "EVANGELISM",
+      "budget": 62000,
+      "spent": 0,
+      "remaining": 62000,
+      "used_pct": null,
+      "status": "ok",
+      "income_budget": 0,
+      "income_actual": 0,
+      "lines": [
+        {
+          "line": "Pastoral & Lay Outreach",
+          "budget": 62000,
+          "spent": 0,
+          "remaining": 62000
+        }
+      ]
+    },
+    {
+      "name": "PERSONAL MINISTRIES / DEPARTMENT LIAISONS",
+      "budget": 52750,
+      "spent": 0,
+      "remaining": 52750,
+      "used_pct": null,
+      "status": "ok",
+      "income_budget": 0,
+      "income_actual": 0,
+      "lines": [
+        {
+          "line": "APS 1 Department Liaisons",
+          "budget": 52750,
+          "spent": 0,
+          "remaining": 52750
+        }
+      ]
+    },
+    {
+      "name": "PROPERTIES",
+      "budget": 11300,
+      "spent": 0,
+      "remaining": 11300,
+      "used_pct": null,
+      "status": "ok",
+      "income_budget": 0,
+      "income_actual": 0,
+      "lines": [
+        {
+          "line": "Conference House Expenses",
+          "budget": 11300,
+          "spent": 0,
+          "remaining": 11300
+        }
+      ]
+    },
+    {
+      "name": "OTHER OPERATIONS",
+      "budget": 7500,
+      "spent": 0,
+      "remaining": 7500,
+      "used_pct": null,
+      "status": "ok",
+      "income_budget": 0,
+      "income_actual": 0,
+      "lines": [
+        {
+          "line": "Miscellaneous Activities",
+          "budget": 7500,
+          "spent": 0,
+          "remaining": 7500
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "income": 0,
+    "spend": 0,
+    "net": 0,
+    "cash": []
+  }
+}

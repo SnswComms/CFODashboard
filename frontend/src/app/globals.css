@@ -1,0 +1,110 @@
+/* Ported from design template.html (global styles block) */
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: #fafaf8;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #e1dfd8;
+  border-radius: 6px;
+  border: 3px solid #fafaf8;
+}
+input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: #e7e5df;
+  outline: none;
+  margin: 0;
+}
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #1b2430;
+  cursor: pointer;
+  border: 3px solid #ffffff;
+  box-shadow: 0 0 0 1px #1b2430;
+}
+input[type='range']::-moz-range-thumb {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #1b2430;
+  cursor: pointer;
+  border: 3px solid #ffffff;
+  box-shadow: 0 0 0 1px #1b2430;
+}
+.num-input {
+  font-family: var(--font-poppins), 'Poppins', sans-serif;
+  font-size: 14px;
+  color: #1b2430;
+  background: #ffffff;
+  border: 1px solid #e7e5df;
+  border-radius: 8px;
+  padding: 9px 11px;
+  width: 100%;
+  outline: none;
+  font-variant-numeric: tabular-nums;
+}
+.num-input:focus {
+  border-color: #1b2430;
+}
+.navbtn:hover {
+  background: #efede7 !important;
+}
+@keyframes cc-toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes cc-pulse {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.fld {
+  width: 100%;
+  font-family: var(--font-poppins), 'Poppins', sans-serif;
+  font-size: 14px;
+  color: #1b2430;
+  background: #ffffff;
+  border: 1px solid #e7e5df;
+  border-radius: 9px;
+  padding: 11px 13px;
+  outline: none;
+}
+.fld:focus {
+  border-color: #1b2430;
+}
+.lnk {
+  color: #8a6a2a;
+  cursor: pointer;
+  font-weight: 500;
+}
+.lnk:hover {
+  color: #6b5320;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

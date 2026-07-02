@@ -31,6 +31,12 @@ cache/
 *.json
 !examples/*.json
 !schemas/*.json
+# App source JSON (manifests, configs, synthetic fixtures) — the blanket
+# *.json above guards private data exports, not code. node_modules/, .next/
+# and data/ stay excluded (directory ignores can't be re-included).
+!backend/**/*.json
+!frontend/**/*.json
+!.claude/launch.json
 
 # Finance source files — never commit live operating data
 *.xlsx
@@ -44,3 +50,12 @@ cache/
 .DS_Store
 .idea/
 .vscode/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

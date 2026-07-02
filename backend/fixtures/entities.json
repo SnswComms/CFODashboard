@@ -1,0 +1,58 @@
+{
+  "generated_at": "2026-01-01T00:00:00",
+  "source": "synthetic",
+  "cfo_budget_dashboard": {
+    "generated_at": "2026-01-01T00:00:00",
+    "budget": {
+      "source": "synthetic budget workbook"
+    },
+    "summary": {
+      "source": "synthetic operating statement summary",
+      "actual": {
+        "conference_income": 1200000,
+        "conference_expense": 1300000,
+        "conference_net": -100000,
+        "aav_net": 50000
+      },
+      "cash_rows": [
+        { "account": "SDA Church Example Ltd CMF", "type": "CMF", "may": 400000 },
+        { "account": "Example Conference Inc Westpac", "type": "Bank", "may": 250000 },
+        { "account": "Example Alpine Village Westpac", "type": "Bank", "may": 80000 }
+      ]
+    },
+    "detail": {
+      "source": "synthetic velixo function extract",
+      "functions": [
+        { "name": "FIELD", "budget": 500000, "actual": 460000, "used_pct": 92.0, "income_actual": 0, "expense_actual": 460000 },
+        { "name": "ADMINISTRATION", "budget": 300000, "actual": 210000, "used_pct": 70.0, "income_actual": 0, "expense_actual": 210000 },
+        { "name": "OTHER OPERATIONS", "budget": 250000, "actual": 150000, "used_pct": 60.0, "income_actual": 20000, "expense_actual": 170000 },
+        { "name": "YOUTH MINISTRY", "budget": 180000, "actual": 120000, "used_pct": 66.7, "income_actual": 30000, "expense_actual": 150000 },
+        { "name": "MINISTERIAL", "budget": 150000, "actual": 90000, "used_pct": 60.0, "income_actual": 0, "expense_actual": 90000 },
+        { "name": "EVANGELISM", "budget": 120000, "actual": 100000, "used_pct": 83.3, "income_actual": 0, "expense_actual": 100000 },
+        { "name": "PROPERTIES", "budget": 200000, "actual": 120000, "used_pct": 60.0, "income_actual": 40000, "expense_actual": 160000 },
+        { "name": "ADVENTIST ALPINE VILLAGE", "budget": 150000, "actual": 90000, "used_pct": 60.0, "income_actual": 220000, "expense_actual": 130000 }
+      ],
+      "lines": [
+        { "function": "FIELD", "line": "Example salaries line", "budget": 300000, "actual": 280000, "variance": 20000 },
+        { "function": "FIELD", "line": "Example motor vehicle allowances line", "budget": 120000, "actual": 110000, "variance": 10000 },
+        { "function": "FIELD", "line": "Example telephone allowances line", "budget": 80000, "actual": 70000, "variance": 10000 },
+        { "function": "ADMINISTRATION", "line": "Example admin services line", "budget": 300000, "actual": 210000, "variance": 90000 },
+        { "function": "OTHER OPERATIONS", "line": "Example operations line", "budget": 250000, "actual": 150000, "variance": 100000 },
+        { "function": "YOUTH MINISTRY", "line": "Example youth camps line", "budget": 180000, "actual": 120000, "variance": 60000 },
+        { "function": "MINISTERIAL", "line": "Example ministerial line", "budget": 150000, "actual": 90000, "variance": 60000 },
+        { "function": "EVANGELISM", "line": "Example evangelism line", "budget": 120000, "actual": 100000, "variance": 20000 },
+        { "function": "PROPERTIES", "line": "Example property usage line", "budget": 200000, "actual": 120000, "variance": 80000 },
+        { "function": "ADVENTIST ALPINE VILLAGE", "line": "Example campground line", "budget": 150000, "actual": 90000, "variance": 60000 }
+      ]
+    }
+  },
+  "staff_cost_dashboard": {
+    "generated_at": "2026-01-01T00:00:00",
+    "source": "synthetic staff cost extract",
+    "fy": [
+      { "fy": "23-24", "total_cost": 2000000, "unique_staff": 50 },
+      { "fy": "24-25", "total_cost": 2200000, "unique_staff": 55 },
+      { "fy": "25-26", "total_cost": 2400000, "unique_staff": 60 }
+    ]
+  }
+}

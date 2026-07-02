@@ -1,0 +1,1226 @@
+{
+  "generated_at": "2026-01-01T00:00:00",
+  "generator": "synthetic",
+  "source_root": "synthetic://session",
+  "source_root_url": "",
+  "method": "Synthetic fixture catalogue for local development. Folder catalogue + filename/status heuristics; no PDF deep parsing and no source mutation.",
+  "years": [
+    {
+      "year": "2005",
+      "folder": "synthetic://session/2005",
+      "folder_url": "",
+      "exists": true,
+      "file_count": 2,
+      "extension_counts": {
+        ".pdf": 1,
+        ".xlsx": 1
+      },
+      "top_evidence": [
+        {
+          "id": "2005-example-session-report-a-pdf",
+          "year": "2005",
+          "name": "Example Session Report A.pdf",
+          "relative_path": "2005/Example Session Report A.pdf",
+          "path": "synthetic://session/2005/Example Session Report A.pdf",
+          "url": "",
+          "extension": ".pdf",
+          "mime_guess": "application/pdf",
+          "size_bytes": 200000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "candidate evidence",
+          "scores": {
+            "master_report": 2,
+            "finance_statements": 1,
+            "investigation": 0,
+            "constituency_story": 2
+          }
+        },
+        {
+          "id": "2005-example-tithe-data-graphs-b-xlsx",
+          "year": "2005",
+          "name": "Example Tithe Data Graphs B.xlsx",
+          "relative_path": "2005/Example Tithe Data Graphs B.xlsx",
+          "path": "synthetic://session/2005/Example Tithe Data Graphs B.xlsx",
+          "url": "",
+          "extension": ".xlsx",
+          "mime_guess": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "size_bytes": 50000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "working / draft / update",
+          "scores": {
+            "master_report": 1,
+            "finance_statements": 1,
+            "investigation": 1,
+            "constituency_story": 1
+          }
+        }
+      ],
+      "all_files": [
+        {
+          "id": "2005-example-session-report-a-pdf",
+          "year": "2005",
+          "name": "Example Session Report A.pdf",
+          "relative_path": "2005/Example Session Report A.pdf",
+          "path": "synthetic://session/2005/Example Session Report A.pdf",
+          "url": "",
+          "extension": ".pdf",
+          "mime_guess": "application/pdf",
+          "size_bytes": 200000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "candidate evidence",
+          "scores": {
+            "master_report": 2,
+            "finance_statements": 1,
+            "investigation": 0,
+            "constituency_story": 2
+          }
+        },
+        {
+          "id": "2005-example-tithe-data-graphs-b-xlsx",
+          "year": "2005",
+          "name": "Example Tithe Data Graphs B.xlsx",
+          "relative_path": "2005/Example Tithe Data Graphs B.xlsx",
+          "path": "synthetic://session/2005/Example Tithe Data Graphs B.xlsx",
+          "url": "",
+          "extension": ".xlsx",
+          "mime_guess": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "size_bytes": 50000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "working / draft / update",
+          "scores": {
+            "master_report": 1,
+            "finance_statements": 1,
+            "investigation": 1,
+            "constituency_story": 1
+          }
+        }
+      ],
+      "trend_point": {
+        "session_year": "2005",
+        "published_member_count": null,
+        "published_delegate_count": null,
+        "source_state": "catalogued; counts not extracted in this starter pass",
+        "primary_evidence_ids": [
+          "2005-example-session-report-a-pdf",
+          "2005-example-tithe-data-graphs-b-xlsx"
+        ]
+      }
+    },
+    {
+      "year": "2008",
+      "folder": "synthetic://session/2008",
+      "folder_url": "",
+      "exists": true,
+      "file_count": 2,
+      "extension_counts": {
+        ".pdf": 1,
+        ".xlsx": 1
+      },
+      "top_evidence": [
+        {
+          "id": "2008-example-session-report-a-pdf",
+          "year": "2008",
+          "name": "Example Session Report A.pdf",
+          "relative_path": "2008/Example Session Report A.pdf",
+          "path": "synthetic://session/2008/Example Session Report A.pdf",
+          "url": "",
+          "extension": ".pdf",
+          "mime_guess": "application/pdf",
+          "size_bytes": 200000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "candidate evidence",
+          "scores": {
+            "master_report": 2,
+            "finance_statements": 1,
+            "investigation": 0,
+            "constituency_story": 2
+          }
+        },
+        {
+          "id": "2008-example-tithe-data-graphs-b-xlsx",
+          "year": "2008",
+          "name": "Example Tithe Data Graphs B.xlsx",
+          "relative_path": "2008/Example Tithe Data Graphs B.xlsx",
+          "path": "synthetic://session/2008/Example Tithe Data Graphs B.xlsx",
+          "url": "",
+          "extension": ".xlsx",
+          "mime_guess": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "size_bytes": 50000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "working / draft / update",
+          "scores": {
+            "master_report": 1,
+            "finance_statements": 1,
+            "investigation": 1,
+            "constituency_story": 1
+          }
+        }
+      ],
+      "all_files": [
+        {
+          "id": "2008-example-session-report-a-pdf",
+          "year": "2008",
+          "name": "Example Session Report A.pdf",
+          "relative_path": "2008/Example Session Report A.pdf",
+          "path": "synthetic://session/2008/Example Session Report A.pdf",
+          "url": "",
+          "extension": ".pdf",
+          "mime_guess": "application/pdf",
+          "size_bytes": 200000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "candidate evidence",
+          "scores": {
+            "master_report": 2,
+            "finance_statements": 1,
+            "investigation": 0,
+            "constituency_story": 2
+          }
+        },
+        {
+          "id": "2008-example-tithe-data-graphs-b-xlsx",
+          "year": "2008",
+          "name": "Example Tithe Data Graphs B.xlsx",
+          "relative_path": "2008/Example Tithe Data Graphs B.xlsx",
+          "path": "synthetic://session/2008/Example Tithe Data Graphs B.xlsx",
+          "url": "",
+          "extension": ".xlsx",
+          "mime_guess": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "size_bytes": 50000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "working / draft / update",
+          "scores": {
+            "master_report": 1,
+            "finance_statements": 1,
+            "investigation": 1,
+            "constituency_story": 1
+          }
+        }
+      ],
+      "trend_point": {
+        "session_year": "2008",
+        "published_member_count": null,
+        "published_delegate_count": null,
+        "source_state": "catalogued; counts not extracted in this starter pass",
+        "primary_evidence_ids": [
+          "2008-example-session-report-a-pdf",
+          "2008-example-tithe-data-graphs-b-xlsx"
+        ]
+      }
+    },
+    {
+      "year": "2011",
+      "folder": "synthetic://session/2011",
+      "folder_url": "",
+      "exists": true,
+      "file_count": 2,
+      "extension_counts": {
+        ".pdf": 1,
+        ".xlsx": 1
+      },
+      "top_evidence": [
+        {
+          "id": "2011-example-session-report-a-pdf",
+          "year": "2011",
+          "name": "Example Session Report A.pdf",
+          "relative_path": "2011/Example Session Report A.pdf",
+          "path": "synthetic://session/2011/Example Session Report A.pdf",
+          "url": "",
+          "extension": ".pdf",
+          "mime_guess": "application/pdf",
+          "size_bytes": 200000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "candidate evidence",
+          "scores": {
+            "master_report": 2,
+            "finance_statements": 1,
+            "investigation": 0,
+            "constituency_story": 2
+          }
+        },
+        {
+          "id": "2011-example-tithe-data-graphs-b-xlsx",
+          "year": "2011",
+          "name": "Example Tithe Data Graphs B.xlsx",
+          "relative_path": "2011/Example Tithe Data Graphs B.xlsx",
+          "path": "synthetic://session/2011/Example Tithe Data Graphs B.xlsx",
+          "url": "",
+          "extension": ".xlsx",
+          "mime_guess": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "size_bytes": 50000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "working / draft / update",
+          "scores": {
+            "master_report": 1,
+            "finance_statements": 1,
+            "investigation": 1,
+            "constituency_story": 1
+          }
+        }
+      ],
+      "all_files": [
+        {
+          "id": "2011-example-session-report-a-pdf",
+          "year": "2011",
+          "name": "Example Session Report A.pdf",
+          "relative_path": "2011/Example Session Report A.pdf",
+          "path": "synthetic://session/2011/Example Session Report A.pdf",
+          "url": "",
+          "extension": ".pdf",
+          "mime_guess": "application/pdf",
+          "size_bytes": 200000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "candidate evidence",
+          "scores": {
+            "master_report": 2,
+            "finance_statements": 1,
+            "investigation": 0,
+            "constituency_story": 2
+          }
+        },
+        {
+          "id": "2011-example-tithe-data-graphs-b-xlsx",
+          "year": "2011",
+          "name": "Example Tithe Data Graphs B.xlsx",
+          "relative_path": "2011/Example Tithe Data Graphs B.xlsx",
+          "path": "synthetic://session/2011/Example Tithe Data Graphs B.xlsx",
+          "url": "",
+          "extension": ".xlsx",
+          "mime_guess": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "size_bytes": 50000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "working / draft / update",
+          "scores": {
+            "master_report": 1,
+            "finance_statements": 1,
+            "investigation": 1,
+            "constituency_story": 1
+          }
+        }
+      ],
+      "trend_point": {
+        "session_year": "2011",
+        "published_member_count": null,
+        "published_delegate_count": null,
+        "source_state": "catalogued; counts not extracted in this starter pass",
+        "primary_evidence_ids": [
+          "2011-example-session-report-a-pdf",
+          "2011-example-tithe-data-graphs-b-xlsx"
+        ]
+      }
+    },
+    {
+      "year": "2014",
+      "folder": "synthetic://session/2014",
+      "folder_url": "",
+      "exists": true,
+      "file_count": 2,
+      "extension_counts": {
+        ".pdf": 1,
+        ".xlsx": 1
+      },
+      "top_evidence": [
+        {
+          "id": "2014-example-session-report-a-pdf",
+          "year": "2014",
+          "name": "Example Session Report A.pdf",
+          "relative_path": "2014/Example Session Report A.pdf",
+          "path": "synthetic://session/2014/Example Session Report A.pdf",
+          "url": "",
+          "extension": ".pdf",
+          "mime_guess": "application/pdf",
+          "size_bytes": 200000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "candidate evidence",
+          "scores": {
+            "master_report": 2,
+            "finance_statements": 1,
+            "investigation": 0,
+            "constituency_story": 2
+          }
+        },
+        {
+          "id": "2014-example-tithe-data-graphs-b-xlsx",
+          "year": "2014",
+          "name": "Example Tithe Data Graphs B.xlsx",
+          "relative_path": "2014/Example Tithe Data Graphs B.xlsx",
+          "path": "synthetic://session/2014/Example Tithe Data Graphs B.xlsx",
+          "url": "",
+          "extension": ".xlsx",
+          "mime_guess": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "size_bytes": 50000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "working / draft / update",
+          "scores": {
+            "master_report": 1,
+            "finance_statements": 1,
+            "investigation": 1,
+            "constituency_story": 1
+          }
+        }
+      ],
+      "all_files": [
+        {
+          "id": "2014-example-session-report-a-pdf",
+          "year": "2014",
+          "name": "Example Session Report A.pdf",
+          "relative_path": "2014/Example Session Report A.pdf",
+          "path": "synthetic://session/2014/Example Session Report A.pdf",
+          "url": "",
+          "extension": ".pdf",
+          "mime_guess": "application/pdf",
+          "size_bytes": 200000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "candidate evidence",
+          "scores": {
+            "master_report": 2,
+            "finance_statements": 1,
+            "investigation": 0,
+            "constituency_story": 2
+          }
+        },
+        {
+          "id": "2014-example-tithe-data-graphs-b-xlsx",
+          "year": "2014",
+          "name": "Example Tithe Data Graphs B.xlsx",
+          "relative_path": "2014/Example Tithe Data Graphs B.xlsx",
+          "path": "synthetic://session/2014/Example Tithe Data Graphs B.xlsx",
+          "url": "",
+          "extension": ".xlsx",
+          "mime_guess": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "size_bytes": 50000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "working / draft / update",
+          "scores": {
+            "master_report": 1,
+            "finance_statements": 1,
+            "investigation": 1,
+            "constituency_story": 1
+          }
+        }
+      ],
+      "trend_point": {
+        "session_year": "2014",
+        "published_member_count": null,
+        "published_delegate_count": null,
+        "source_state": "catalogued; counts not extracted in this starter pass",
+        "primary_evidence_ids": [
+          "2014-example-session-report-a-pdf",
+          "2014-example-tithe-data-graphs-b-xlsx"
+        ]
+      }
+    },
+    {
+      "year": "2017",
+      "folder": "synthetic://session/2017",
+      "folder_url": "",
+      "exists": true,
+      "file_count": 2,
+      "extension_counts": {
+        ".pdf": 1,
+        ".xlsx": 1
+      },
+      "top_evidence": [
+        {
+          "id": "2017-example-session-report-a-pdf",
+          "year": "2017",
+          "name": "Example Session Report A.pdf",
+          "relative_path": "2017/Example Session Report A.pdf",
+          "path": "synthetic://session/2017/Example Session Report A.pdf",
+          "url": "",
+          "extension": ".pdf",
+          "mime_guess": "application/pdf",
+          "size_bytes": 200000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "candidate evidence",
+          "scores": {
+            "master_report": 2,
+            "finance_statements": 1,
+            "investigation": 0,
+            "constituency_story": 2
+          }
+        },
+        {
+          "id": "2017-example-tithe-data-graphs-b-xlsx",
+          "year": "2017",
+          "name": "Example Tithe Data Graphs B.xlsx",
+          "relative_path": "2017/Example Tithe Data Graphs B.xlsx",
+          "path": "synthetic://session/2017/Example Tithe Data Graphs B.xlsx",
+          "url": "",
+          "extension": ".xlsx",
+          "mime_guess": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "size_bytes": 50000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "working / draft / update",
+          "scores": {
+            "master_report": 1,
+            "finance_statements": 1,
+            "investigation": 1,
+            "constituency_story": 1
+          }
+        }
+      ],
+      "all_files": [
+        {
+          "id": "2017-example-session-report-a-pdf",
+          "year": "2017",
+          "name": "Example Session Report A.pdf",
+          "relative_path": "2017/Example Session Report A.pdf",
+          "path": "synthetic://session/2017/Example Session Report A.pdf",
+          "url": "",
+          "extension": ".pdf",
+          "mime_guess": "application/pdf",
+          "size_bytes": 200000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "candidate evidence",
+          "scores": {
+            "master_report": 2,
+            "finance_statements": 1,
+            "investigation": 0,
+            "constituency_story": 2
+          }
+        },
+        {
+          "id": "2017-example-tithe-data-graphs-b-xlsx",
+          "year": "2017",
+          "name": "Example Tithe Data Graphs B.xlsx",
+          "relative_path": "2017/Example Tithe Data Graphs B.xlsx",
+          "path": "synthetic://session/2017/Example Tithe Data Graphs B.xlsx",
+          "url": "",
+          "extension": ".xlsx",
+          "mime_guess": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "size_bytes": 50000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "working / draft / update",
+          "scores": {
+            "master_report": 1,
+            "finance_statements": 1,
+            "investigation": 1,
+            "constituency_story": 1
+          }
+        }
+      ],
+      "trend_point": {
+        "session_year": "2017",
+        "published_member_count": null,
+        "published_delegate_count": null,
+        "source_state": "catalogued; counts not extracted in this starter pass",
+        "primary_evidence_ids": [
+          "2017-example-session-report-a-pdf",
+          "2017-example-tithe-data-graphs-b-xlsx"
+        ]
+      }
+    },
+    {
+      "year": "2021",
+      "folder": "synthetic://session/2021",
+      "folder_url": "",
+      "exists": true,
+      "file_count": 2,
+      "extension_counts": {
+        ".pdf": 1,
+        ".xlsx": 1
+      },
+      "top_evidence": [
+        {
+          "id": "2021-example-session-report-a-pdf",
+          "year": "2021",
+          "name": "Example Session Report A.pdf",
+          "relative_path": "2021/Example Session Report A.pdf",
+          "path": "synthetic://session/2021/Example Session Report A.pdf",
+          "url": "",
+          "extension": ".pdf",
+          "mime_guess": "application/pdf",
+          "size_bytes": 200000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "candidate evidence",
+          "scores": {
+            "master_report": 2,
+            "finance_statements": 1,
+            "investigation": 0,
+            "constituency_story": 2
+          }
+        },
+        {
+          "id": "2021-example-tithe-data-graphs-b-xlsx",
+          "year": "2021",
+          "name": "Example Tithe Data Graphs B.xlsx",
+          "relative_path": "2021/Example Tithe Data Graphs B.xlsx",
+          "path": "synthetic://session/2021/Example Tithe Data Graphs B.xlsx",
+          "url": "",
+          "extension": ".xlsx",
+          "mime_guess": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "size_bytes": 50000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "working / draft / update",
+          "scores": {
+            "master_report": 1,
+            "finance_statements": 1,
+            "investigation": 1,
+            "constituency_story": 1
+          }
+        }
+      ],
+      "all_files": [
+        {
+          "id": "2021-example-session-report-a-pdf",
+          "year": "2021",
+          "name": "Example Session Report A.pdf",
+          "relative_path": "2021/Example Session Report A.pdf",
+          "path": "synthetic://session/2021/Example Session Report A.pdf",
+          "url": "",
+          "extension": ".pdf",
+          "mime_guess": "application/pdf",
+          "size_bytes": 200000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "candidate evidence",
+          "scores": {
+            "master_report": 2,
+            "finance_statements": 1,
+            "investigation": 0,
+            "constituency_story": 2
+          }
+        },
+        {
+          "id": "2021-example-tithe-data-graphs-b-xlsx",
+          "year": "2021",
+          "name": "Example Tithe Data Graphs B.xlsx",
+          "relative_path": "2021/Example Tithe Data Graphs B.xlsx",
+          "path": "synthetic://session/2021/Example Tithe Data Graphs B.xlsx",
+          "url": "",
+          "extension": ".xlsx",
+          "mime_guess": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "size_bytes": 50000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "working / draft / update",
+          "scores": {
+            "master_report": 1,
+            "finance_statements": 1,
+            "investigation": 1,
+            "constituency_story": 1
+          }
+        }
+      ],
+      "trend_point": {
+        "session_year": "2021",
+        "published_member_count": null,
+        "published_delegate_count": null,
+        "source_state": "catalogued; counts not extracted in this starter pass",
+        "primary_evidence_ids": [
+          "2021-example-session-report-a-pdf",
+          "2021-example-tithe-data-graphs-b-xlsx"
+        ]
+      }
+    },
+    {
+      "year": "2025",
+      "folder": "synthetic://session/2025",
+      "folder_url": "",
+      "exists": true,
+      "file_count": 2,
+      "extension_counts": {
+        ".pdf": 1,
+        ".xlsx": 1
+      },
+      "top_evidence": [
+        {
+          "id": "2025-example-session-report-a-pdf",
+          "year": "2025",
+          "name": "Example Session Report A.pdf",
+          "relative_path": "2025/Example Session Report A.pdf",
+          "path": "synthetic://session/2025/Example Session Report A.pdf",
+          "url": "",
+          "extension": ".pdf",
+          "mime_guess": "application/pdf",
+          "size_bytes": 200000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "candidate evidence",
+          "scores": {
+            "master_report": 2,
+            "finance_statements": 1,
+            "investigation": 0,
+            "constituency_story": 2
+          }
+        },
+        {
+          "id": "2025-example-tithe-data-graphs-b-xlsx",
+          "year": "2025",
+          "name": "Example Tithe Data Graphs B.xlsx",
+          "relative_path": "2025/Example Tithe Data Graphs B.xlsx",
+          "path": "synthetic://session/2025/Example Tithe Data Graphs B.xlsx",
+          "url": "",
+          "extension": ".xlsx",
+          "mime_guess": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "size_bytes": 50000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "working / draft / update",
+          "scores": {
+            "master_report": 1,
+            "finance_statements": 1,
+            "investigation": 1,
+            "constituency_story": 1
+          }
+        }
+      ],
+      "all_files": [
+        {
+          "id": "2025-example-session-report-a-pdf",
+          "year": "2025",
+          "name": "Example Session Report A.pdf",
+          "relative_path": "2025/Example Session Report A.pdf",
+          "path": "synthetic://session/2025/Example Session Report A.pdf",
+          "url": "",
+          "extension": ".pdf",
+          "mime_guess": "application/pdf",
+          "size_bytes": 200000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "candidate evidence",
+          "scores": {
+            "master_report": 2,
+            "finance_statements": 1,
+            "investigation": 0,
+            "constituency_story": 2
+          }
+        },
+        {
+          "id": "2025-example-tithe-data-graphs-b-xlsx",
+          "year": "2025",
+          "name": "Example Tithe Data Graphs B.xlsx",
+          "relative_path": "2025/Example Tithe Data Graphs B.xlsx",
+          "path": "synthetic://session/2025/Example Tithe Data Graphs B.xlsx",
+          "url": "",
+          "extension": ".xlsx",
+          "mime_guess": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "size_bytes": 50000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "working / draft / update",
+          "scores": {
+            "master_report": 1,
+            "finance_statements": 1,
+            "investigation": 1,
+            "constituency_story": 1
+          }
+        }
+      ],
+      "trend_point": {
+        "session_year": "2025",
+        "published_member_count": null,
+        "published_delegate_count": null,
+        "source_state": "catalogued; counts not extracted in this starter pass",
+        "primary_evidence_ids": [
+          "2025-example-session-report-a-pdf",
+          "2025-example-tithe-data-graphs-b-xlsx"
+        ]
+      }
+    }
+  ],
+  "claims": [
+    {
+      "id": "membership-delegate-spine",
+      "question": "What are the published membership and delegate counts at each session?",
+      "status": "needs extraction",
+      "why": "This is the master report spine, but the current pass only catalogues source files. Counts should be lifted from published report pages/slides, not inferred.",
+      "search_terms": [
+        "member",
+        "membership",
+        "delegate",
+        "constituency",
+        "session report"
+      ],
+      "priority": "high",
+      "evidence_ids": [
+        "2005-example-session-report-a-pdf",
+        "2008-example-session-report-a-pdf",
+        "2011-example-session-report-a-pdf",
+        "2014-example-session-report-a-pdf",
+        "2017-example-session-report-a-pdf",
+        "2021-example-session-report-a-pdf",
+        "2025-example-session-report-a-pdf"
+      ],
+      "evidence": [
+        {
+          "id": "2005-example-session-report-a-pdf",
+          "year": "2005",
+          "name": "Example Session Report A.pdf",
+          "relative_path": "2005/Example Session Report A.pdf",
+          "path": "synthetic://session/2005/Example Session Report A.pdf",
+          "url": "",
+          "extension": ".pdf",
+          "mime_guess": "application/pdf",
+          "size_bytes": 200000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "candidate evidence",
+          "scores": {
+            "master_report": 2,
+            "finance_statements": 1,
+            "investigation": 0,
+            "constituency_story": 2
+          }
+        },
+        {
+          "id": "2008-example-session-report-a-pdf",
+          "year": "2008",
+          "name": "Example Session Report A.pdf",
+          "relative_path": "2008/Example Session Report A.pdf",
+          "path": "synthetic://session/2008/Example Session Report A.pdf",
+          "url": "",
+          "extension": ".pdf",
+          "mime_guess": "application/pdf",
+          "size_bytes": 200000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "candidate evidence",
+          "scores": {
+            "master_report": 2,
+            "finance_statements": 1,
+            "investigation": 0,
+            "constituency_story": 2
+          }
+        },
+        {
+          "id": "2011-example-session-report-a-pdf",
+          "year": "2011",
+          "name": "Example Session Report A.pdf",
+          "relative_path": "2011/Example Session Report A.pdf",
+          "path": "synthetic://session/2011/Example Session Report A.pdf",
+          "url": "",
+          "extension": ".pdf",
+          "mime_guess": "application/pdf",
+          "size_bytes": 200000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "candidate evidence",
+          "scores": {
+            "master_report": 2,
+            "finance_statements": 1,
+            "investigation": 0,
+            "constituency_story": 2
+          }
+        },
+        {
+          "id": "2014-example-session-report-a-pdf",
+          "year": "2014",
+          "name": "Example Session Report A.pdf",
+          "relative_path": "2014/Example Session Report A.pdf",
+          "path": "synthetic://session/2014/Example Session Report A.pdf",
+          "url": "",
+          "extension": ".pdf",
+          "mime_guess": "application/pdf",
+          "size_bytes": 200000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "candidate evidence",
+          "scores": {
+            "master_report": 2,
+            "finance_statements": 1,
+            "investigation": 0,
+            "constituency_story": 2
+          }
+        },
+        {
+          "id": "2017-example-session-report-a-pdf",
+          "year": "2017",
+          "name": "Example Session Report A.pdf",
+          "relative_path": "2017/Example Session Report A.pdf",
+          "path": "synthetic://session/2017/Example Session Report A.pdf",
+          "url": "",
+          "extension": ".pdf",
+          "mime_guess": "application/pdf",
+          "size_bytes": 200000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "candidate evidence",
+          "scores": {
+            "master_report": 2,
+            "finance_statements": 1,
+            "investigation": 0,
+            "constituency_story": 2
+          }
+        },
+        {
+          "id": "2021-example-session-report-a-pdf",
+          "year": "2021",
+          "name": "Example Session Report A.pdf",
+          "relative_path": "2021/Example Session Report A.pdf",
+          "path": "synthetic://session/2021/Example Session Report A.pdf",
+          "url": "",
+          "extension": ".pdf",
+          "mime_guess": "application/pdf",
+          "size_bytes": 200000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "candidate evidence",
+          "scores": {
+            "master_report": 2,
+            "finance_statements": 1,
+            "investigation": 0,
+            "constituency_story": 2
+          }
+        },
+        {
+          "id": "2025-example-session-report-a-pdf",
+          "year": "2025",
+          "name": "Example Session Report A.pdf",
+          "relative_path": "2025/Example Session Report A.pdf",
+          "path": "synthetic://session/2025/Example Session Report A.pdf",
+          "url": "",
+          "extension": ".pdf",
+          "mime_guess": "application/pdf",
+          "size_bytes": 200000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "candidate evidence",
+          "scores": {
+            "master_report": 2,
+            "finance_statements": 1,
+            "investigation": 0,
+            "constituency_story": 2
+          }
+        }
+      ]
+    },
+    {
+      "id": "tithe-growth-claims",
+      "question": "Do tithe-growth claims reconcile across the CFO slides, graph workbooks, and published reports?",
+      "status": "queued",
+      "why": "Several Tithe Data / Graphs & Charts workbooks exist across 2008-2025 and should be compared before using growth language.",
+      "search_terms": [
+        "tithe",
+        "graphs",
+        "charts",
+        "CFO",
+        "treasurer"
+      ],
+      "priority": "high",
+      "evidence_ids": [
+        "2005-example-tithe-data-graphs-b-xlsx",
+        "2008-example-tithe-data-graphs-b-xlsx",
+        "2011-example-tithe-data-graphs-b-xlsx",
+        "2014-example-tithe-data-graphs-b-xlsx",
+        "2017-example-tithe-data-graphs-b-xlsx",
+        "2021-example-tithe-data-graphs-b-xlsx",
+        "2025-example-tithe-data-graphs-b-xlsx"
+      ],
+      "evidence": [
+        {
+          "id": "2005-example-tithe-data-graphs-b-xlsx",
+          "year": "2005",
+          "name": "Example Tithe Data Graphs B.xlsx",
+          "relative_path": "2005/Example Tithe Data Graphs B.xlsx",
+          "path": "synthetic://session/2005/Example Tithe Data Graphs B.xlsx",
+          "url": "",
+          "extension": ".xlsx",
+          "mime_guess": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "size_bytes": 50000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "working / draft / update",
+          "scores": {
+            "master_report": 1,
+            "finance_statements": 1,
+            "investigation": 1,
+            "constituency_story": 1
+          }
+        },
+        {
+          "id": "2008-example-tithe-data-graphs-b-xlsx",
+          "year": "2008",
+          "name": "Example Tithe Data Graphs B.xlsx",
+          "relative_path": "2008/Example Tithe Data Graphs B.xlsx",
+          "path": "synthetic://session/2008/Example Tithe Data Graphs B.xlsx",
+          "url": "",
+          "extension": ".xlsx",
+          "mime_guess": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "size_bytes": 50000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "working / draft / update",
+          "scores": {
+            "master_report": 1,
+            "finance_statements": 1,
+            "investigation": 1,
+            "constituency_story": 1
+          }
+        },
+        {
+          "id": "2011-example-tithe-data-graphs-b-xlsx",
+          "year": "2011",
+          "name": "Example Tithe Data Graphs B.xlsx",
+          "relative_path": "2011/Example Tithe Data Graphs B.xlsx",
+          "path": "synthetic://session/2011/Example Tithe Data Graphs B.xlsx",
+          "url": "",
+          "extension": ".xlsx",
+          "mime_guess": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "size_bytes": 50000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "working / draft / update",
+          "scores": {
+            "master_report": 1,
+            "finance_statements": 1,
+            "investigation": 1,
+            "constituency_story": 1
+          }
+        },
+        {
+          "id": "2014-example-tithe-data-graphs-b-xlsx",
+          "year": "2014",
+          "name": "Example Tithe Data Graphs B.xlsx",
+          "relative_path": "2014/Example Tithe Data Graphs B.xlsx",
+          "path": "synthetic://session/2014/Example Tithe Data Graphs B.xlsx",
+          "url": "",
+          "extension": ".xlsx",
+          "mime_guess": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "size_bytes": 50000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "working / draft / update",
+          "scores": {
+            "master_report": 1,
+            "finance_statements": 1,
+            "investigation": 1,
+            "constituency_story": 1
+          }
+        },
+        {
+          "id": "2017-example-tithe-data-graphs-b-xlsx",
+          "year": "2017",
+          "name": "Example Tithe Data Graphs B.xlsx",
+          "relative_path": "2017/Example Tithe Data Graphs B.xlsx",
+          "path": "synthetic://session/2017/Example Tithe Data Graphs B.xlsx",
+          "url": "",
+          "extension": ".xlsx",
+          "mime_guess": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "size_bytes": 50000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "working / draft / update",
+          "scores": {
+            "master_report": 1,
+            "finance_statements": 1,
+            "investigation": 1,
+            "constituency_story": 1
+          }
+        },
+        {
+          "id": "2021-example-tithe-data-graphs-b-xlsx",
+          "year": "2021",
+          "name": "Example Tithe Data Graphs B.xlsx",
+          "relative_path": "2021/Example Tithe Data Graphs B.xlsx",
+          "path": "synthetic://session/2021/Example Tithe Data Graphs B.xlsx",
+          "url": "",
+          "extension": ".xlsx",
+          "mime_guess": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "size_bytes": 50000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "working / draft / update",
+          "scores": {
+            "master_report": 1,
+            "finance_statements": 1,
+            "investigation": 1,
+            "constituency_story": 1
+          }
+        },
+        {
+          "id": "2025-example-tithe-data-graphs-b-xlsx",
+          "year": "2025",
+          "name": "Example Tithe Data Graphs B.xlsx",
+          "relative_path": "2025/Example Tithe Data Graphs B.xlsx",
+          "path": "synthetic://session/2025/Example Tithe Data Graphs B.xlsx",
+          "url": "",
+          "extension": ".xlsx",
+          "mime_guess": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "size_bytes": 50000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "working / draft / update",
+          "scores": {
+            "master_report": 1,
+            "finance_statements": 1,
+            "investigation": 1,
+            "constituency_story": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "draft-vs-final-risk",
+      "question": "Which finance statements are final/published versus drafts, old copies, or updated sheets?",
+      "status": "catalogued",
+      "why": "The 2021 and 2025 lanes include final-looking reports plus OLD/draft/update artefacts; evidence labels need clear source status.",
+      "search_terms": [
+        "draft",
+        "old",
+        "final",
+        "updated",
+        "audit opinion"
+      ],
+      "priority": "medium",
+      "evidence_ids": [
+        "2005-example-tithe-data-graphs-b-xlsx",
+        "2008-example-tithe-data-graphs-b-xlsx",
+        "2011-example-tithe-data-graphs-b-xlsx",
+        "2014-example-tithe-data-graphs-b-xlsx",
+        "2017-example-tithe-data-graphs-b-xlsx",
+        "2021-example-tithe-data-graphs-b-xlsx",
+        "2025-example-tithe-data-graphs-b-xlsx"
+      ],
+      "evidence": [
+        {
+          "id": "2005-example-tithe-data-graphs-b-xlsx",
+          "year": "2005",
+          "name": "Example Tithe Data Graphs B.xlsx",
+          "relative_path": "2005/Example Tithe Data Graphs B.xlsx",
+          "path": "synthetic://session/2005/Example Tithe Data Graphs B.xlsx",
+          "url": "",
+          "extension": ".xlsx",
+          "mime_guess": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "size_bytes": 50000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "working / draft / update",
+          "scores": {
+            "master_report": 1,
+            "finance_statements": 1,
+            "investigation": 1,
+            "constituency_story": 1
+          }
+        },
+        {
+          "id": "2008-example-tithe-data-graphs-b-xlsx",
+          "year": "2008",
+          "name": "Example Tithe Data Graphs B.xlsx",
+          "relative_path": "2008/Example Tithe Data Graphs B.xlsx",
+          "path": "synthetic://session/2008/Example Tithe Data Graphs B.xlsx",
+          "url": "",
+          "extension": ".xlsx",
+          "mime_guess": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "size_bytes": 50000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "working / draft / update",
+          "scores": {
+            "master_report": 1,
+            "finance_statements": 1,
+            "investigation": 1,
+            "constituency_story": 1
+          }
+        },
+        {
+          "id": "2011-example-tithe-data-graphs-b-xlsx",
+          "year": "2011",
+          "name": "Example Tithe Data Graphs B.xlsx",
+          "relative_path": "2011/Example Tithe Data Graphs B.xlsx",
+          "path": "synthetic://session/2011/Example Tithe Data Graphs B.xlsx",
+          "url": "",
+          "extension": ".xlsx",
+          "mime_guess": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "size_bytes": 50000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "working / draft / update",
+          "scores": {
+            "master_report": 1,
+            "finance_statements": 1,
+            "investigation": 1,
+            "constituency_story": 1
+          }
+        },
+        {
+          "id": "2014-example-tithe-data-graphs-b-xlsx",
+          "year": "2014",
+          "name": "Example Tithe Data Graphs B.xlsx",
+          "relative_path": "2014/Example Tithe Data Graphs B.xlsx",
+          "path": "synthetic://session/2014/Example Tithe Data Graphs B.xlsx",
+          "url": "",
+          "extension": ".xlsx",
+          "mime_guess": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "size_bytes": 50000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "working / draft / update",
+          "scores": {
+            "master_report": 1,
+            "finance_statements": 1,
+            "investigation": 1,
+            "constituency_story": 1
+          }
+        },
+        {
+          "id": "2017-example-tithe-data-graphs-b-xlsx",
+          "year": "2017",
+          "name": "Example Tithe Data Graphs B.xlsx",
+          "relative_path": "2017/Example Tithe Data Graphs B.xlsx",
+          "path": "synthetic://session/2017/Example Tithe Data Graphs B.xlsx",
+          "url": "",
+          "extension": ".xlsx",
+          "mime_guess": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "size_bytes": 50000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "working / draft / update",
+          "scores": {
+            "master_report": 1,
+            "finance_statements": 1,
+            "investigation": 1,
+            "constituency_story": 1
+          }
+        },
+        {
+          "id": "2021-example-tithe-data-graphs-b-xlsx",
+          "year": "2021",
+          "name": "Example Tithe Data Graphs B.xlsx",
+          "relative_path": "2021/Example Tithe Data Graphs B.xlsx",
+          "path": "synthetic://session/2021/Example Tithe Data Graphs B.xlsx",
+          "url": "",
+          "extension": ".xlsx",
+          "mime_guess": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "size_bytes": 50000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "working / draft / update",
+          "scores": {
+            "master_report": 1,
+            "finance_statements": 1,
+            "investigation": 1,
+            "constituency_story": 1
+          }
+        },
+        {
+          "id": "2025-example-tithe-data-graphs-b-xlsx",
+          "year": "2025",
+          "name": "Example Tithe Data Graphs B.xlsx",
+          "relative_path": "2025/Example Tithe Data Graphs B.xlsx",
+          "path": "synthetic://session/2025/Example Tithe Data Graphs B.xlsx",
+          "url": "",
+          "extension": ".xlsx",
+          "mime_guess": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "size_bytes": 50000,
+          "modified": "2026-01-01T00:00",
+          "source_status": "working / draft / update",
+          "scores": {
+            "master_report": 1,
+            "finance_statements": 1,
+            "investigation": 1,
+            "constituency_story": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "entity-boundary",
+      "question": "Are SNC, SNE, SNU, school, company and conference figures being mixed?",
+      "status": "queued",
+      "why": "The folders contain multiple reporting entities. Challenge claims that use a single figure without entity boundary.",
+      "search_terms": [
+        "SNC",
+        "SNE",
+        "SNU",
+        "school",
+        "conference",
+        "trust"
+      ],
+      "priority": "high",
+      "evidence_ids": [],
+      "evidence": []
+    },
+    {
+      "id": "working-capital-cashflow",
+      "question": "Where working-capital or cashflow claims appear, do they point to the matching statement and year?",
+      "status": "queued",
+      "why": "Working capital and cashflow files appear explicitly in 2021/2025; they should be evidence-backed before narrative use.",
+      "search_terms": [
+        "working capital",
+        "cashflow",
+        "cash flow",
+        "balance sheet"
+      ],
+      "priority": "medium",
+      "evidence_ids": [],
+      "evidence": []
+    }
+  ],
+  "warnings": [],
+  "all_evidence_count": 14
+}

@@ -1,0 +1,86 @@
+{
+  "generated_at": "2026-06-01T09:00:00",
+  "source_rule": "MYOB API/cache only for actual balances; screenshot account numbers are reconciliation targets only.",
+  "source_status": "MYOB cash endpoint probe 2026-06-01T08:45:00+00:00",
+  "cmf_status": "MYOB CMF cash extractor 2026-06-01T08:50:00+00:00",
+  "cash_account_candidates": [
+    {
+      "_endpoint": "CashAccount",
+      "CashAccountCD": "111200",
+      "Description": "Example Bank Account (AUD)",
+      "Balance": 100000,
+      "Active": true
+    },
+    {
+      "_endpoint": "CashAccount",
+      "CashAccountCD": "111300",
+      "Description": "Example Cash Management Facility (AUD)",
+      "Balance": 250000,
+      "Active": true
+    },
+    {
+      "_endpoint": "Account",
+      "AccountCD": "111100",
+      "Description": "Example Cash on hand",
+      "CashAccount": true,
+      "Type": "Asset"
+    },
+    {
+      "_endpoint": "Account",
+      "AccountCD": "111500",
+      "Descr": "Example Term deposits",
+      "CurrentBalance": 50000,
+      "CashAccount": true,
+      "Type": "Asset"
+    }
+  ],
+  "targets": [
+    {
+      "system": "Westpac",
+      "name": "Example Entity A",
+      "external_account": "032-000 111222",
+      "myob_source": null,
+      "myob_balance": null,
+      "status": "awaiting MYOB endpoint match"
+    },
+    {
+      "system": "Westpac",
+      "name": "Example Entity B",
+      "external_account": "032-000 333444",
+      "myob_source": null,
+      "myob_balance": null,
+      "status": "awaiting MYOB endpoint match"
+    },
+    {
+      "system": "Westpac",
+      "name": "Example Entity C",
+      "external_account": "032-000 555666",
+      "myob_source": null,
+      "myob_balance": null,
+      "status": "awaiting MYOB endpoint match"
+    },
+    {
+      "system": "CMF",
+      "name": "EXAMPLE MEMBER FUND ONE",
+      "external_account": "10000001",
+      "myob_source": null,
+      "myob_balance": null,
+      "status": "awaiting MYOB endpoint match"
+    },
+    {
+      "system": "CMF",
+      "name": "EXAMPLE MEMBER FUND TWO",
+      "external_account": "10000002",
+      "myob_source": null,
+      "myob_balance": null,
+      "status": "awaiting MYOB endpoint match"
+    }
+  ],
+  "recommended_myob_accounts": [
+    { "AccountCD": "111200", "Description": "Bank account (AUD)" },
+    { "AccountCD": "111300", "Description": "Cash Management Facility (AUD)" },
+    { "AccountCD": "111100", "Description": "Cash on hand" },
+    { "AccountCD": "111400", "Description": "Cash held for agency" },
+    { "AccountCD": "111500", "Description": "Term deposits" }
+  ]
+}

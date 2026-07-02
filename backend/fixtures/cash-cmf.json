@@ -1,0 +1,133 @@
+{
+  "generated_at": "2026-06-01T08:50:00+00:00",
+  "source": "MYOB Advanced via Morpheus MYOBReader, read-only GET JournalTransaction/Account for CMF cash",
+  "from_date": "2026-01-01",
+  "to_date": null,
+  "base_endpoint_family": "Default/24.200.001",
+  "target_accounts": ["111300"],
+  "journals_scanned": 120,
+  "line_count": 8,
+  "accounts": [
+    {
+      "AccountCD": "111300",
+      "Description": "Cash Management Facility (AUD)",
+      "Type": "Asset",
+      "AccountClass": "CASHASSET",
+      "CashAccount": true,
+      "AccountID": "00000000-0000-0000-0000-000000000001"
+    }
+  ],
+  "balances_by_account": {
+    "111300": 5000
+  },
+  "balances_by_account_subaccount": [
+    { "account": "111300", "subaccount": "000-000", "net_debit": 4000 },
+    { "account": "111300", "subaccount": "100-000", "net_debit": 1000 }
+  ],
+  "lines": [
+    {
+      "date": "2026-01-05",
+      "period": "012026",
+      "batch": "GL000001",
+      "reference": "JE000001",
+      "account": "111300",
+      "subaccount": "000-000",
+      "debit": 10000,
+      "credit": 0,
+      "net_debit": 10000,
+      "line_description": "Example deposit A",
+      "header_description": "Example journal batch 1"
+    },
+    {
+      "date": "2026-01-20",
+      "period": "012026",
+      "batch": "GL000002",
+      "reference": "JE000002",
+      "account": "111300",
+      "subaccount": "000-000",
+      "debit": 0,
+      "credit": 4000,
+      "net_debit": -4000,
+      "line_description": "Example withdrawal A",
+      "header_description": "Example journal batch 2"
+    },
+    {
+      "date": "2026-02-03",
+      "period": "022026",
+      "batch": "GL000003",
+      "reference": "JE000003",
+      "account": "111300",
+      "subaccount": "000-000",
+      "debit": 2000,
+      "credit": 0,
+      "net_debit": 2000,
+      "line_description": "Example deposit B",
+      "header_description": "Example journal batch 3"
+    },
+    {
+      "date": "2026-02-18",
+      "period": "022026",
+      "batch": "GL000004",
+      "reference": "JE000004",
+      "account": "111300",
+      "subaccount": "100-000",
+      "debit": 1500,
+      "credit": 0,
+      "net_debit": 1500,
+      "line_description": "Example transfer in",
+      "header_description": "Example journal batch 4"
+    },
+    {
+      "date": "2026-03-02",
+      "period": "032026",
+      "batch": "GL000005",
+      "reference": "JE000005",
+      "account": "111300",
+      "subaccount": "100-000",
+      "debit": 0,
+      "credit": 500,
+      "net_debit": -500,
+      "line_description": "Example fee",
+      "header_description": "Example journal batch 5"
+    },
+    {
+      "date": "2026-03-15",
+      "period": "032026",
+      "batch": "GL000006",
+      "reference": "JE000006",
+      "account": "111300",
+      "subaccount": "000-000",
+      "debit": 0,
+      "credit": 5000,
+      "net_debit": -5000,
+      "line_description": "Example withdrawal B",
+      "header_description": "Example journal batch 6"
+    },
+    {
+      "date": "2026-03-15",
+      "period": "032026",
+      "batch": "GL000006",
+      "reference": "JE000006",
+      "account": "111300",
+      "subaccount": "000-000",
+      "debit": 1000,
+      "credit": 0,
+      "net_debit": 1000,
+      "line_description": "Example correction",
+      "header_description": "Example journal batch 6"
+    },
+    {
+      "date": "2026-03-28",
+      "period": "032026",
+      "batch": "GL000007",
+      "reference": "JE000007",
+      "account": "111300",
+      "subaccount": "000-000",
+      "debit": 0,
+      "credit": 0,
+      "net_debit": 0,
+      "line_description": "Example memo line",
+      "header_description": "Example journal batch 7"
+    }
+  ]
+}
