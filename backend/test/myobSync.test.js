@@ -26,6 +26,15 @@ const flatLine = (overrides) => ({
   ...overrides,
 });
 
+// Expense-shaped live-gl line factory for the department report tests.
+const glLine = (overrides) => ({
+  kind: "JournalTransaction", date: "2025-08-01", period: "022026", branch: "SNC", module: "GL",
+  batch: "GJ-1", reference: "GJ-1", account: "703430", account_description: "Local church evangelism",
+  subaccount: "EVA-000", project: "", vendor_customer: "", header_description: "",
+  line_description: "", debit: 0, credit: 0, net_debit: 0, source_endpoint: "JournalTransaction",
+  ...overrides,
+});
+
 // Raw journal as MYOB returns it: every scalar {value}-wrapped, with the
 // field-name variants seen across rows (Branch/DebitAmt/AccountID/Descr).
 const RAW_JOURNALS = [
@@ -148,13 +157,6 @@ test("buildCmfDocument sums net movements per target account and subaccount", ()
 });
 
 test("buildDepartmentReport groups expense lines by subaccount prefix", () => {
-  const glLine = (overrides) => ({
-    kind: "JournalTransaction", date: "2025-08-01", period: "022026", branch: "SNC", module: "GL",
-    batch: "GJ-1", reference: "GJ-1", account: "703430", account_description: "Local church evangelism",
-    subaccount: "EVA-000", project: "", vendor_customer: "", header_description: "",
-    line_description: "", debit: 0, credit: 0, net_debit: 0, source_endpoint: "JournalTransaction",
-    ...overrides,
-  });
   const lines = [
     glLine({ debit: 100, net_debit: 100 }),                                             // EVA -> EVANGELISM
     glLine({ subaccount: "FLD-000", debit: 200, net_debit: 200 }),                      // FLD -> FIELD
@@ -170,29 +172,121 @@ test("buildDepartmentReport groups expense lines by subaccount prefix", () => {
 
   assert.equal(report.period_context.source_kind, "myob_live_gl_cache");
   assert.equal(report.period_context.actual_period_label, "Jun 2026 actuals to date (MYOB live GL cache)");
+  // clean run: no embedded sync errors, so consumers treat the report as current
+  assert.deepEqual(report.period_context.source_errors, []);
+  assert.equal(report.period_context.confidence, "high");
 
   const byName = Object.fromEntries(report.departments.map((department) => [department.name, department]));
   // every approved department is present even with no activity
   assert.equal(report.departments.length, Object.keys(byName).length);
   assert.ok(byName["BIG CAMP"]);
   assert.equal(byName["BIG CAMP"].spent, 0);
+  // zero-actual departments fall back to the approved budget line list
+  assert.deepEqual(byName["BIG CAMP"].lines, [
+    { line: "Annual Convention Expense", account: null, budget: 193620, spent: 0, remaining: 193620, line_count: 0 },
+  ]);
 
   const evangelism = byName["EVANGELISM"];
   assert.equal(evangelism.budget, 62000);
   assert.equal(evangelism.spent, 100);
   assert.equal(evangelism.remaining, 61900);
   assert.equal(evangelism.status, "ok");
+  // actual lines carry budget 0 / remaining -spent plus transaction evidence
   assert.deepEqual(evangelism.lines, [
-    { line: "703430 Local church evangelism", account: "703430", budget: null, spent: 100, remaining: null, line_count: 1 },
+    {
+      line: "703430 Local church evangelism",
+      account: "703430",
+      budget: 0,
+      spent: 100,
+      remaining: -100,
+      line_count: 1,
+      evidence: [
+        {
+          date: "2025-08-01",
+          period: "022026",
+          reference: "GJ-1",
+          batch: "GJ-1",
+          subaccount: "EVA-000",
+          description: "",
+          net_debit: 100,
+        },
+      ],
+    },
   ]);
 
   assert.equal(byName["FIELD"].spent, 200);
   assert.equal(byName["ADMINISTRATION"].income_actual, 500);
 
+  // unmapped expense spend is its own row, so departments reconcile to summary.spend
+  const unmapped = byName["UNMAPPED"];
+  assert.equal(report.departments[report.departments.length - 1].name, "UNMAPPED");
+  assert.deepEqual(
+    { budget: unmapped.budget, spent: unmapped.spent, remaining: unmapped.remaining, used_pct: unmapped.used_pct, status: unmapped.status },
+    { budget: 0, spent: 50, remaining: -50, used_pct: null, status: "over" }
+  );
+  assert.deepEqual(unmapped.lines, [
+    { line: "Unmapped prefix XYZ", account: "XYZ", budget: 0, spent: 50, remaining: -50, line_count: null },
+  ]);
+  const rowSpend = report.departments.reduce((sum, department) => sum + department.spent, 0);
+  assert.equal(rowSpend, report.summary.spend);
+
   assert.deepEqual(report.mapping.unmapped_prefix_totals, { XYZ: 50 });
-  assert.deepEqual(report.mapping.excluded_non_expense_account_totals, { 111300: 25 });
+  // excluded totals keyed "code description" from the chart join
+  assert.deepEqual(report.mapping.excluded_non_expense_account_totals, { "111300 Cash Management Facility": 25 });
   assert.deepEqual(report.mapping.subaccount_prefix_to_department, require("../src/constants/approvedBudget").PREFIX_TO_DEPT);
   assert.deepEqual(report.summary, { income: 500, spend: 350, net: 150, cash: [] });
+});
+
+test("buildDepartmentReport caps per-line evidence at 8 and flags degraded runs", () => {
+  const lines = Array.from({ length: 9 }, (_, i) =>
+    glLine({ batch: `GJ-${i + 1}`, reference: `GJ-${i + 1}`, line_description: `Purchase ${i + 1}`, debit: 10, net_debit: 10 })
+  );
+  const report = sync.buildDepartmentReport(lines, CHART, {
+    generatedAt: "2026-07-02T00:00:00",
+    fromDate: "2025-07-01",
+    toDate: "2026-06-30",
+    errors: ["JournalTransaction: HTTP 500"],
+  });
+
+  // sync-run errors ride the report so budgetService can refuse to trust it
+  assert.deepEqual(report.period_context.source_errors, ["JournalTransaction: HTTP 500"]);
+  assert.equal(report.period_context.confidence, "degraded");
+
+  const [entry] = report.departments.find((department) => department.name === "EVANGELISM").lines;
+  assert.equal(entry.line_count, 9);
+  assert.equal(entry.spent, 90);
+  assert.equal(entry.remaining, -90);
+  assert.equal(entry.evidence.length, 8);
+  assert.deepEqual(entry.evidence[0], {
+    date: "2025-08-01",
+    period: "022026",
+    reference: "GJ-1",
+    batch: "GJ-1",
+    subaccount: "EVA-000",
+    description: "Purchase 1",
+    net_debit: 10,
+  });
+  assert.equal(entry.evidence[7].reference, "GJ-8");
+});
+
+test("buildDepartmentReport keeps the 30 largest excluded account totals", () => {
+  const lines = Array.from({ length: 35 }, (_, i) =>
+    glLine({ account: `1113${String(i).padStart(2, "0")}`, subaccount: "ADM-000", debit: i + 1, net_debit: i + 1 })
+  );
+  const report = sync.buildDepartmentReport(lines, CHART, {
+    generatedAt: "2026-07-02T00:00:00",
+    fromDate: "2025-07-01",
+    toDate: "2026-06-30",
+  });
+
+  const excluded = report.mapping.excluded_non_expense_account_totals;
+  // capped to the 30 largest absolute movements; the 5 smallest fall off
+  // (integer-like keys re-serialize in numeric order, so assert membership)
+  assert.equal(Object.keys(excluded).length, 30);
+  assert.equal(excluded["111334"], 35);
+  assert.equal(excluded["111305"], 6);
+  assert.equal(excluded["111304"], undefined);
+  assert.equal(excluded["111300 Cash Management Facility"], undefined);
 });
 
 test("buildBroadCache keeps rows raw and names the journal sample key from the from date", () => {
@@ -440,5 +534,21 @@ test("POST /api/myob/sync is 503 without MYOB_CACHE_DIR and validates company", 
     const bad = await requestJson(base, "/api/myob/sync?company=prod", { method: "POST" });
     assert.equal(bad.status, 400);
     assert.equal(bad.body.code, "BAD_REQUEST");
+
+    // Custom-window validation runs in the controller before the service, so a
+    // malformed date is rejected 400 even with the cache dir unset.
+    const badFormat = await requestJson(base, "/api/myob/sync", {
+      method: "POST",
+      body: { from_date: "2026/01/01" },
+    });
+    assert.equal(badFormat.status, 400);
+    assert.equal(badFormat.body.code, "BAD_REQUEST");
+
+    const inverted = await requestJson(base, "/api/myob/sync", {
+      method: "POST",
+      body: { from_date: "2026-06-30", to_date: "2026-01-01" },
+    });
+    assert.equal(inverted.status, 400);
+    assert.match(inverted.body.error, /from_date must be on or before to_date/);
   });
 });

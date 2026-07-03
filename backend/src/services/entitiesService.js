@@ -849,6 +849,10 @@ function buildSncDetail(context, kit) {
         const fn = context.functions[name] || {};
         return [name, toNumber(fn.budget), toNumber(fn.actual), toNumber(fn.used_pct)];
       }),
+      // Parallel per-row EvidenceObject list (the legacy page attached an
+      // Evidence button to every function row). Additive: `rows` keeps its
+      // bare-array shape so existing consumers are untouched.
+      row_evidence: SNC_FUNCTION_NAMES.map((name) => kit.functionEvidence(name)),
     },
   ];
   return {
@@ -1245,8 +1249,60 @@ function getFieldPastoralStaff(query) {
   };
 }
 
-function getHistoryComparison(query) {
-  return pagedDocList(loadHistoryComparisonDoc, "rows", query);
+// Overlays live Mongo history coverage (myobHistoryService.historyCoverage())
+// onto the static history-comparison rows. Only the two rows whose status is
+// actually derivable from the history store are rewritten — the MYOB-era
+// detail row and the department budget-vs-actual row, matched by a stable
+// substring of their fixture `area`; SUN legacy, payroll, session and SNC
+// operating rows pass through untouched. Exported for tests.
+function overlayHistoryCoverage(doc, coverage) {
+  const visible = coverage.visibleFys.length > 0 ? coverage.visibleFys.join(", ") : null;
+  const floor = coverage.floorDate ?? "the MYOB era start";
+  const rows = doc.data.rows.map((row) => {
+    const area = String(row.area ?? "").toLowerCase();
+    if (area.includes("myob current-era")) {
+      return visible
+        ? { ...row, status: "Available", what: `Journal history from ${floor}; prior FYs queryable: ${visible}.` }
+        : {
+            ...row,
+            status: "Current year only",
+            what: "History store reachable but no prior FYs pass the mapping gate yet; only current-FY MYOB detail can be quoted.",
+          };
+    }
+    if (area.includes("department budget vs actual")) {
+      if (!visible) {
+        return {
+          ...row,
+          status: "Current year only",
+          what: "FY2026 approved budget vs current actuals exists; no prior FYs pass the mapping gate yet, so prior-year department/function comparisons stay unavailable.",
+        };
+      }
+      const budgets =
+        coverage.budgetFys.length > 0
+          ? `budget rows loaded for ${coverage.budgetFys.map((entry) => entry.fy).join(", ")}`
+          : "no prior-year budget rows loaded";
+      return {
+        ...row,
+        status: "Available",
+        what: `FY2026 approved budget vs current actuals, plus prior-FY actuals queryable: ${visible} (journal history from ${floor}; ${budgets}).`,
+      };
+    }
+    return row;
+  });
+  return { data: { ...doc.data, rows }, meta: doc.meta };
+}
+
+// Live overlay on top of the resolved doc: when the Mongo history store is
+// reachable, the two derivable rows report real coverage instead of the
+// design-era snapshot. historyCoverage() never throws and returns null when
+// the store is unavailable (MONGODB_URI unset) or unreadable — the doc is
+// then served exactly as today, fixture bytes untouched.
+async function getHistoryComparison(query) {
+  const doc = pagedDocList(loadHistoryComparisonDoc, "rows", query);
+  // Lazy require: keeps this module free of the history stack (Mongo repo,
+  // MYOB client) at import time and avoids any require cycle.
+  const coverage = await require("./myobHistoryService").historyCoverage();
+  return coverage ? overlayHistoryCoverage(doc, coverage) : doc;
 }
 
 function getEvidenceRegistry(query) {
@@ -1293,6 +1349,7 @@ module.exports = {
   getFieldPastoral,
   getFieldPastoralStaff,
   getHistoryComparison,
+  overlayHistoryCoverage,
   getEvidenceRegistry,
   getEvidenceMetric,
   getEmailIntelligence,

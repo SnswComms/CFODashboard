@@ -37,6 +37,7 @@ export default function Shell({ view, children }: { view: ViewKey; children: Rea
   const [rangeOpen, setRangeOpen] = useState(false);
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
@@ -68,10 +69,25 @@ export default function Shell({ view, children }: { view: ViewKey; children: Rea
     if (blockAdmin) router.replace('/overview');
   }, [blockAdmin, router]);
 
-  // New page, fresh scroll position — mirror normal browser navigation.
+  // New page, fresh scroll position — mirror normal browser navigation. Also
+  // close the mobile drawer so tapping a nav item dismisses the off-canvas menu.
   useEffect(() => {
     document.getElementById('cc-scroll')?.scrollTo({ top: 0 });
+    // Deliberate sync-with-navigation: the drawer must close on ANY view
+    // change (nav tap, cc:navigate event, browser back), so the effect is the
+    // one place that sees them all.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDrawerOpen(false);
   }, [view]);
+
+  // Close the mobile drawer on Escape.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setDrawerOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
 
   if (isPending) {
     return (
@@ -139,10 +155,8 @@ export default function Shell({ view, children }: { view: ViewKey; children: Rea
 
   return (
     <div
+      className="cc-shell"
       style={{
-        display: 'flex',
-        height: '100vh',
-        overflow: 'hidden',
         fontFamily: FONT,
         color: '#1B2430',
         WebkitFontSmoothing: 'antialiased',
@@ -150,14 +164,12 @@ export default function Shell({ view, children }: { view: ViewKey; children: Rea
       }}
     >
       <aside
+        className={`cc-sidebar${drawerOpen ? ' cc-sidebar-open' : ''}`}
         style={{
-          width: 250,
-          flex: 'none',
           background: '#F5F4EF',
           borderRight: '1px solid #E7E5DF',
           display: 'flex',
           flexDirection: 'column',
-          height: '100vh',
         }}
       >
         <div
@@ -344,28 +356,60 @@ export default function Shell({ view, children }: { view: ViewKey; children: Rea
         </div>
       </aside>
 
+      {drawerOpen && (
+        <button
+          className="cc-backdrop"
+          aria-label="Close menu"
+          onClick={() => setDrawerOpen(false)}
+        />
+      )}
+
       <main
         style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100vh', minWidth: 0 }}
       >
         <header
           style={{
             flex: 'none',
+            // backdrop-filter creates a stacking context, which would otherwise
+            // trap the range dropdown below the later-painted page content.
+            // Lift the whole header above content (z 0) but keep it under the
+            // modals/drawers (z 60) so drilldowns still cover the header bar.
+            position: 'relative',
+            zIndex: 50,
             background: 'rgba(250,250,248,.92)',
             backdropFilter: 'blur(8px)',
-            borderBottom: '1px solid #E7E5DF',
           }}
         >
           <div
+            className="cc-header-pad"
             style={{
               maxWidth: 1240,
               margin: '0 auto',
-              padding: '18px 40px',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
               gap: 24,
             }}
           >
+            <button
+              className="cc-hamburger"
+              aria-label="Open menu"
+              onClick={() => setDrawerOpen(true)}
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#39424F"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              >
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+              </svg>
+            </button>
             <div style={{ minWidth: 0 }}>
               <div
                 style={{
@@ -524,75 +568,12 @@ export default function Shell({ view, children }: { view: ViewKey; children: Rea
                   </div>
                 )}
               </div>
-              <span
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 7,
-                  border: '1px solid #E7E5DF',
-                  borderRadius: 999,
-                  padding: '7px 12px',
-                  background: '#FFFFFF',
-                }}
-              >
-                <span
-                  style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: '50%',
-                    background: '#8A6A2A',
-                    display: 'block',
-                  }}
-                />
-                <span
-                  style={{
-                    fontFamily: FONT,
-                    fontSize: 10,
-                    letterSpacing: '.08em',
-                    textTransform: 'uppercase',
-                    color: '#39424F',
-                  }}
-                >
-                  Illustrative
-                </span>
-              </span>
             </div>
           </div>
         </header>
 
         <div id="cc-scroll" style={{ flex: 1, overflowY: 'auto' }}>
-          <div style={{ padding: '34px 40px 72px', maxWidth: 1240, margin: '0 auto' }}>
-            <div
-              style={{
-                marginBottom: 30,
-                borderLeft: '2px solid #C9A24B',
-                background: '#FAF6EC',
-                borderRadius: '0 8px 8px 0',
-                padding: '12px 18px',
-                display: 'flex',
-                gap: 10,
-                alignItems: 'baseline',
-              }}
-            >
-              <span
-                style={{
-                  fontFamily: FONT,
-                  fontSize: 10,
-                  letterSpacing: '.12em',
-                  textTransform: 'uppercase',
-                  color: '#8A6A2A',
-                  fontWeight: 500,
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                Illustrative
-              </span>
-              <span style={{ fontSize: 13, lineHeight: 1.5, color: '#6B5B3A' }}>
-                Board-approved FY2026 budget totals shown with elapsed-year pace standing in for
-                spend. No live, confidential, or MYOB-sourced figures appear in this preview.
-              </span>
-            </div>
-
+          <div className="cc-content-pad" style={{ maxWidth: 1240, margin: '0 auto' }}>
             {blockAdmin ? null : children}
           </div>
         </div>

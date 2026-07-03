@@ -60,9 +60,9 @@ export default function Staffing() {
       if (!alive) return;
       setBaseField(d.base_field);
       setBaseOffice(d.base_office);
-      setVacantPosts(d.vacant_posts);
       // Only seed the editable defaults if the user hasn't started editing.
       if (!touched.current) {
+        setVacantPosts(d.vacant_posts);
         setStaff((st) => ({
           ...st,
           tithe: d.defaults.tithe,
@@ -83,6 +83,11 @@ export default function Staffing() {
       const v = Number(e.target.value);
       setStaff((st) => ({ ...st, [key]: v }));
     };
+
+  const onVacant = (e: React.ChangeEvent<HTMLInputElement>) => {
+    touched.current = true;
+    setVacantPosts(Number(e.target.value));
+  };
 
   // ---- staffing math (verbatim port of app-script.js) ----
   const s = staff;
@@ -131,6 +136,7 @@ export default function Staffing() {
   ];
 
   const fieldLabel: React.CSSProperties = { fontSize: 12, color: '#5B626C', marginBottom: 6 };
+  const fieldHint: React.CSSProperties = { fontSize: 11, color: '#9AA0A8', marginTop: 5, lineHeight: 1.4 };
   const cardEyebrow: React.CSSProperties = {
     fontFamily: FONT,
     fontSize: 10,
@@ -143,22 +149,7 @@ export default function Staffing() {
   return (
     <div>
       <div
-        style={{
-          borderLeft: '2px solid #C9A24B',
-          background: '#FAF6EC',
-          borderRadius: '0 8px 8px 0',
-          padding: '13px 18px',
-          marginBottom: 28,
-          fontSize: 13,
-          lineHeight: 1.5,
-          color: '#6B5B3A',
-        }}
-      >
-        <b style={{ fontWeight: 600, color: '#5B4A2A' }}>Scenario, not a recommendation.</b> This
-        models a tithe-only staffing ceiling against a placeholder FTE package. Real decisions need
-        exact FTE, restricted-funding, cash-timing and governance checks.
-      </div>
-      <div
+        className="cc-grid-stack"
         style={{
           display: 'grid',
           gridTemplateColumns: '1fr 1.4fr',
@@ -185,6 +176,7 @@ export default function Staffing() {
                 value={numVal(staff.tithe)}
                 onChange={mkStaff('tithe')}
               />
+              <div style={fieldHint}>Total tithe income you expect for the year.</div>
             </label>
             <label style={{ display: 'block' }}>
               <div style={fieldLabel}>Staff-cost ceiling (share of tithe)</div>
@@ -195,6 +187,7 @@ export default function Staffing() {
                 value={numVal(staff.ratio)}
                 onChange={mkStaff('ratio')}
               />
+              <div style={fieldHint}>Max share of tithe allowed for staff. Enter 0.75 for 75%.</div>
             </label>
             <label style={{ display: 'block' }}>
               <div style={fieldLabel}>Package cost per FTE</div>
@@ -205,8 +198,9 @@ export default function Staffing() {
                 value={numVal(staff.package)}
                 onChange={mkStaff('package')}
               />
+              <div style={fieldHint}>All-in yearly cost of one full-time staff member.</div>
             </label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div className="cc-grid-2" style={{ gap: 12 }}>
               <label style={{ display: 'block' }}>
                 <div style={fieldLabel}>+ Field FTE</div>
                 <input
@@ -216,6 +210,7 @@ export default function Staffing() {
                   value={numVal(staff.extraField)}
                   onChange={mkStaff('extraField')}
                 />
+                <div style={fieldHint}>Extra field staff to test.</div>
               </label>
               <label style={{ display: 'block' }}>
                 <div style={fieldLabel}>+ Office FTE</div>
@@ -226,8 +221,20 @@ export default function Staffing() {
                   value={numVal(staff.extraOffice)}
                   onChange={mkStaff('extraOffice')}
                 />
+                <div style={fieldHint}>Extra office staff to test.</div>
               </label>
             </div>
+            <label style={{ display: 'block' }}>
+              <div style={fieldLabel}>Vacant posts</div>
+              <input
+                className="num-input"
+                type="number"
+                step={1}
+                value={numVal(vacantPosts)}
+                onChange={onVacant}
+              />
+              <div style={fieldHint}>Open positions not yet filled (field / TBD).</div>
+            </label>
           </div>
         </div>
         <div>
@@ -297,7 +304,7 @@ export default function Staffing() {
               {staffOut.detail}
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
+          <div className="cc-grid-stack" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
             {staffCounts.map((c) => (
               <div
                 key={c.label}

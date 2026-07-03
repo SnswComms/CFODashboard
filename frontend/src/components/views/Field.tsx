@@ -74,6 +74,7 @@ export default function Field() {
       </p>
 
       {/* Field stat tiles */}
+      <div className="cc-scroll-x" style={{ marginBottom: 34 }}>
       <div
         style={{
           display: 'grid',
@@ -83,7 +84,6 @@ export default function Field() {
           border: '1px solid #E7E5DF',
           borderRadius: 12,
           overflow: 'hidden',
-          marginBottom: 34,
         }}
       >
         {data.stats.map((s) => (
@@ -115,11 +115,11 @@ export default function Field() {
           </div>
         ))}
       </div>
+      </div>
 
       <div
+        className="cc-grid-2"
         style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
           gap: 26,
           alignItems: 'start',
         }}

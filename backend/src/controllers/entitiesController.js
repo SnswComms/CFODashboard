@@ -33,8 +33,8 @@ function getFieldPastoralStaff(request, response) {
   send(response, entitiesService.getFieldPastoralStaff(request.query));
 }
 
-function getHistoryComparison(request, response) {
-  send(response, entitiesService.getHistoryComparison(request.query));
+async function getHistoryComparison(request, response) {
+  send(response, await entitiesService.getHistoryComparison(request.query));
 }
 
 function getEvidenceRegistry(request, response) {

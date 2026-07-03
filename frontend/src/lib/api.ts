@@ -30,6 +30,15 @@ const BASE = '/api';
 const DEFAULT_TIMEOUT_MS = 10000;
 const RETRY_DELAY_MS = 1500;
 
+function isEnvelope<T>(body: unknown): body is Envelope<T> {
+  return Boolean(
+    body &&
+      typeof body === 'object' &&
+      'data' in (body as Record<string, unknown>) &&
+      'meta' in (body as Record<string, unknown>)
+  );
+}
+
 function unwrap<T>(body: unknown): T {
   if (
     body &&
@@ -83,6 +92,34 @@ export async function apiGet<T>(path: string, fallback: T, timeoutMs?: number): 
   return request<T>(normalize(path), fallback, undefined, timeoutMs);
 }
 
+async function requestEnvelope<T>(path: string, timeoutMs: number = DEFAULT_TIMEOUT_MS): Promise<Envelope<T> | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(path, { cache: 'no-store', signal: controller.signal });
+    if (!res.ok) return null;
+    const body: unknown = await res.json();
+    return isEnvelope<T>(body) ? body : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * GET an API path and return the FULL envelope ({ data, meta }) so callers can
+ * read meta.warnings alongside the payload. Same no-store/timeout/one-retry
+ * semantics as apiGet; resolves null on any error, non-2xx, timeout, or a
+ * non-envelope body — callers fall back on their design constants.
+ */
+export async function apiGetEnvelope<T>(path: string, timeoutMs?: number): Promise<Envelope<T> | null> {
+  const first = await requestEnvelope<T>(normalize(path), timeoutMs);
+  if (first !== null) return first;
+  await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+  return requestEnvelope<T>(normalize(path), timeoutMs);
+}
+
 /** POST JSON to an API path; same unwrap/fallback semantics as apiGet. */
 export function apiPost<T>(path: string, payload: unknown, fallback: T, timeoutMs?: number): Promise<T> {
   return request<T>(
@@ -133,4 +170,34 @@ export function useApiGet<T>(path: string, fallback: T, timeoutMs?: number): T {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path, timeoutMs]);
   return data;
+}
+
+/**
+ * Envelope-preserving twin of useApiGet: same mount + focus-refetch semantics,
+ * but resolves the full { data, meta } so views can surface meta.warnings.
+ * Null until the first successful response (and after any failure) — callers
+ * derive their payload as `env?.data ?? FALLBACK`.
+ */
+export function useApiGetEnvelope<T>(path: string, timeoutMs?: number): Envelope<T> | null {
+  const [env, setEnv] = useState<Envelope<T> | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const load = () => {
+      apiGetEnvelope<T>(path, timeoutMs).then((e) => {
+        if (alive) setEnv(e);
+      });
+    };
+    load();
+    const onFocus = () => {
+      if (document.visibilityState === 'visible') load();
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onFocus);
+    return () => {
+      alive = false;
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onFocus);
+    };
+  }, [path, timeoutMs]);
+  return env;
 }

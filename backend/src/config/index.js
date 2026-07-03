@@ -53,6 +53,15 @@ const myob = {
   timeoutMs: Number(process.env.MYOB_TIMEOUT_MS || 120000),
   // In-process refresh cadence for server.js; 0 disables the scheduler.
   syncIntervalHours: Number(process.env.MYOB_SYNC_INTERVAL_HOURS ?? 6),
+  // Live GL cache age past which command-centre responses carry a staleness
+  // warning (the sync runs 6-hourly, so 48h means several missed runs).
+  // 0 warns immediately; negative or non-numeric values fall back to 48h so a
+  // bad env var can never silently disable staleness detection.
+  staleAfterHours:
+    Number.isFinite(Number(process.env.MYOB_STALE_AFTER_HOURS ?? 48)) &&
+    Number(process.env.MYOB_STALE_AFTER_HOURS ?? 48) >= 0
+      ? Number(process.env.MYOB_STALE_AFTER_HOURS ?? 48)
+      : 48,
 };
 
 // Decision copilot LLM — Qwen served by vLLM on morpheus (Tailscale peer,
@@ -68,11 +77,36 @@ const copilot = {
   llmEnabled: process.env.COPILOT_LLM_DISABLED !== "1" && process.env.NODE_ENV !== "test",
 };
 
+// The VPS mongod runs with `--tlsMode requireTLS` and a client-CA, so every
+// connection must speak mutual TLS: present a CA-signed client cert and trust
+// the server via the same CA. Cert paths are resolved relative to backendRoot
+// so a relative .env value (e.g. ./certs/client.pem) works regardless of cwd.
+// TLS engages only when both files are configured; unset = plaintext (local
+// mongo / synthetic mode). Shared by lib/mongo.js and auth/mongo.js.
+const mongoTlsCaFile = process.env.MONGODB_TLS_CA_FILE
+  ? path.resolve(backendRoot, process.env.MONGODB_TLS_CA_FILE)
+  : null;
+const mongoTlsCertKeyFile = process.env.MONGODB_TLS_CERT_KEY_FILE
+  ? path.resolve(backendRoot, process.env.MONGODB_TLS_CERT_KEY_FILE)
+  : null;
+
+const mongoClientOptions = {
+  // Fail requests in ~5s when the tunnel is down instead of the driver's 30s
+  // default, keeping API/auth endpoints responsive.
+  serverSelectionTimeoutMS: 5000,
+};
+if (mongoTlsCaFile && mongoTlsCertKeyFile) {
+  mongoClientOptions.tls = true;
+  mongoClientOptions.tlsCAFile = mongoTlsCaFile;
+  mongoClientOptions.tlsCertificateKeyFile = mongoTlsCertKeyFile;
+}
+
 module.exports = {
   port: Number(process.env.PORT || 4000),
   frontendOrigin: process.env.FRONTEND_ORIGIN || "http://localhost:3000",
   mongoUri: process.env.MONGODB_URI || null,
   mongoDb: process.env.MONGODB_DB || "cfodashboard",
+  mongoClientOptions,
   cfoDataDir,
   dirs,
   resolve,

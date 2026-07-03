@@ -35,6 +35,21 @@ function getTransport(user, pass) {
   return transport;
 }
 
+// Snapshot of the mailer's effective mode — no network I/O. `live` means a
+// sendMail() call right now would attempt a real SMTP delivery (i.e. not
+// dry-run and Gmail creds are present); callers surface this so admins are
+// not told "sent" while sends silently degrade to logged dry-runs.
+function mailStatus() {
+  const { dryRun, user, pass, from } = settings();
+  const hasCreds = Boolean(user && pass);
+  return {
+    live: !dryRun && hasCreds,
+    dryRun,
+    hasCreds,
+    from: from || user,
+  };
+}
+
 async function sendMail({ to, subject, html, text }) {
   const { dryRun, user, pass, from } = settings();
   if (dryRun || !user || !pass) {
@@ -56,4 +71,4 @@ async function sendMail({ to, subject, html, text }) {
   }
 }
 
-module.exports = { sendMail };
+module.exports = { sendMail, mailStatus };

@@ -1,10 +1,21 @@
 const { betterAuth } = require("better-auth");
+const { createAuthMiddleware, getSessionFromCtx, APIError, isAPIError } = require("better-auth/api");
 const { mongodbAdapter } = require("better-auth/adapters/mongodb");
 const { memoryAdapter } = require("better-auth/adapters/memory");
 const { admin } = require("better-auth/plugins");
 
 const config = require("../config");
 const { getAuthDb } = require("./mongo");
+
+// Without an explicit secret Better Auth falls back to a built-in default, so
+// session cookies stop verifying whenever the process restarts (and are
+// trivially forgeable). Warn loudly but keep booting — synthetic/test mode
+// runs without one on purpose.
+if (!config.betterAuthSecret) {
+  console.warn(
+    "[auth] BETTER_AUTH_SECRET is not set; sessions will not be stable across restarts. Set it in the environment for production use."
+  );
+}
 
 // FROZEN cross-agent interface: sendMail({ to, subject, html, text }) from
 // ../lib/mailer and the render* functions from ../emails (owned by the email
@@ -50,6 +61,10 @@ function markWelcomePending(email, invitedBy) {
 function clearWelcomePending(email) {
   welcomePending.delete(String(email).toLowerCase());
 }
+
+// Admin endpoints where an admin must never target their own account. The
+// frontend disables the buttons, but the server is the enforcement point.
+const SELF_ACTION_PATHS = new Set(["/admin/ban-user", "/admin/remove-user", "/admin/set-role"]);
 
 const handle = getAuthDb(); // { db, client } | null (null in synthetic mode)
 
@@ -106,6 +121,54 @@ const auth = betterAuth({
     },
   },
   plugins: [admin({ defaultRole: "user", adminRoles: ["admin"] })],
+  hooks: {
+    // Self-action guard: reject ban / remove / set-role requests that target
+    // the calling admin's own account. Runs before the admin plugin's handler.
+    before: createAuthMiddleware(async (ctx) => {
+      if (!SELF_ACTION_PATHS.has(ctx.path)) return;
+      const targetId = ctx.body && ctx.body.userId;
+      if (!targetId) return; // let the endpoint's own body validation respond
+      // No session => fall through to the admin plugin's own 401 handling.
+      const session = await getSessionFromCtx(ctx);
+      if (!session || !session.user) return;
+      if (String(targetId) === String(session.user.id)) {
+        throw new APIError("BAD_REQUEST", {
+          message: "You cannot perform this action on your own account",
+          code: "SELF_ACTION_NOT_ALLOWED",
+        });
+      }
+    }),
+    // Ban/unban notifications: tell the AFFECTED user their account status
+    // changed. Fire-and-forget like sendResetPassword — a mail (or lookup)
+    // failure must never alter the admin's response.
+    after: createAuthMiddleware(async (ctx) => {
+      if (ctx.path !== "/admin/ban-user" && ctx.path !== "/admin/unban-user") return;
+      // ctx.context.returned holds the handler result: { user } on success,
+      // the APIError when the underlying action failed (nothing to announce).
+      // isAPIError (duck-typed) rather than instanceof: better-call's body
+      // validation throws its own APIError class, not better-auth's subclass.
+      const returned = ctx.context.returned;
+      if (!returned || isAPIError(returned)) return;
+      const targetId = ctx.body && ctx.body.userId;
+      if (!targetId) return;
+      try {
+        const target = await ctx.context.internalAdapter.findUserById(targetId);
+        if (!target || !target.email) return;
+        const banned = ctx.path === "/admin/ban-user";
+        const { sendMail, emails } = getMail();
+        void sendMail({
+          to: target.email,
+          ...emails.renderAccountStatusEmail({
+            name: target.name,
+            banned,
+            reason: banned ? ctx.body.banReason : "",
+          }),
+        });
+      } catch (err) {
+        console.warn(`[auth] account-status email skipped: ${err && err.message ? err.message : err}`);
+      }
+    }),
+  },
 });
 
 module.exports = { auth, markWelcomePending, clearWelcomePending };

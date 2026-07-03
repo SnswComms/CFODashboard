@@ -9,7 +9,10 @@ const config = require("../config");
 const { BadRequestError } = require("../lib/errors");
 const { chatComplete } = require("../lib/qwenClient");
 const { loadLiveGl } = require("../repositories/myobCacheRepository");
+const { readJsonFile } = require("../repositories/jsonFileRepository");
 const { buildLiveModel } = require("./commandCentreDerivation");
+const { observationSentence } = require("./observationService");
+const history = require("./myobHistoryService");
 const {
   GENERATED_AT,
   APPROVED_TOTALS,
@@ -34,6 +37,47 @@ const {
 
 const META = { dataSource: "synthetic" };
 
+// Data-health warnings for live responses (live mode only — synthetic meta
+// never carries them): sync errors embedded in the cache doc by the sync run
+// (myobSyncService), errors from a failed last run in sync-status.json, and a
+// staleness check on the extract timestamp (config.myob.staleAfterHours; the
+// scheduler runs 6-hourly, so a stale cache means several missed runs).
+function liveHealth(doc) {
+  const warnings = [];
+  const push = (warning) => {
+    if (warning && !warnings.includes(warning)) warnings.push(warning);
+  };
+  for (const error of Array.isArray(doc.errors) ? doc.errors : []) {
+    push("MYOB sync: " + error);
+  }
+  const status = readJsonFile(config.resolve("myobCache", "sync-status.json"));
+  const lastRun = status && status.last_run;
+  if (lastRun && lastRun.ok === false) {
+    for (const error of Array.isArray(lastRun.errors) ? lastRun.errors : []) {
+      push("MYOB sync: " + error);
+    }
+  }
+  const extractedAt = Date.parse(doc.generated_at ?? "");
+  const stale =
+    Number.isFinite(extractedAt) &&
+    Date.now() - extractedAt > config.myob.staleAfterHours * 60 * 60 * 1000;
+  if (!Number.isFinite(extractedAt)) {
+    // A cache with no readable timestamp could be arbitrarily old — warn
+    // rather than silently reporting it Current.
+    push("MYOB GL cache has no readable extract timestamp; staleness cannot be checked");
+  }
+  if (stale) {
+    push(
+      "MYOB GL cache is stale — last extract " +
+        String(doc.generated_at).slice(0, 10) +
+        " is older than " +
+        config.myob.staleAfterHours +
+        "h",
+    );
+  }
+  return { warnings, stale };
+}
+
 // Live-gl cache model, or null when only the synthetic fixture is available.
 // loadLiveGl falls back to fixtures/myob-live-gl.json, but the command centre
 // deliberately ignores that fallback — its synthetic contract is the design
@@ -41,7 +85,7 @@ const META = { dataSource: "synthetic" };
 function liveModel() {
   const { data, meta } = loadLiveGl();
   if (meta.dataSource !== "live-cache" || !data || !Array.isArray(data.journal_lines)) return null;
-  return buildLiveModel(data, meta);
+  return buildLiveModel(data, meta, liveHealth(data));
 }
 
 // ---- shared derivation helpers (contract §2 rules) ----
@@ -91,7 +135,9 @@ function getOverview() {
       generated_at: live.generated_at,
       kpis: live.overviewKpis,
       dash_cards: DASH_CARDS,
-      alerts: ALERTS,
+      // Live mode derives real alerts (overs, tights, data warnings) instead
+      // of the design constants; the synthetic branch above keeps ALERTS.
+      alerts: live.alerts,
       freshness: [...FRESHNESS, live.freshnessEntry],
       // Additive fields (live only): derived YTD totals, the board-approved
       // totals, and the cumulative monthly trend backing the overview chart.
@@ -103,7 +149,9 @@ function getOverview() {
   };
 }
 
-function getFunctions() {
+// Async because of the LLM-written observation line (observationService) —
+// cached per data fingerprint, so the hop only happens when the GL changes.
+async function getFunctions() {
   const live = liveModel();
   if (live) {
     return {
@@ -112,7 +160,7 @@ function getFunctions() {
         period: live.period,
         kpis: live.opKpis,
         composition: live.composition,
-        observation: live.observation,
+        observation: await observationSentence(live),
         functions: live.functions,
       },
       meta: live.meta,
@@ -138,7 +186,21 @@ function getFunctions() {
 function getDepartments() {
   const live = liveModel();
   if (live) {
-    return { data: { generated_at: live.generated_at, departments: live.departments }, meta: live.meta };
+    return {
+      data: {
+        generated_at: live.generated_at,
+        departments: live.departments,
+        // Additive fields (live only): the derived period and a provenance
+        // caption. Worded against department-level actuals — line figures are
+        // still the contract-§3 proportional estimates, even in live mode.
+        period: live.period,
+        source_note:
+          "Live MYOB GL actuals to " +
+          String(live.generated_at ?? "").slice(0, 10) +
+          " · approved FY2026 board budgets",
+      },
+      meta: live.meta,
+    };
   }
   const departments = DEPT_RAW.map((dept) => {
     const { spent, remaining, status } = computeUsage(dept.budget, dept.used);
@@ -153,6 +215,28 @@ function getDepartments() {
 }
 
 function getLanes() {
+  const live = liveModel();
+  if (live) {
+    return {
+      data: {
+        generated_at: live.generated_at,
+        lanes: live.lanes.map((lane) => ({
+          id: lane.id,
+          title: lane.title,
+          hint: lane.hint,
+          budget: lane.budget,
+          spent: lane.spent,
+          remaining: lane.budget - lane.spent,
+          default_request: lane.default_request,
+          // Additive fields (live only): the GL evidence behind the derived
+          // spent figure — full match tally plus a capped line sample.
+          match_count: lane.match_count,
+          matched_lines: lane.matched_lines,
+        })),
+      },
+      meta: live.meta,
+    };
+  }
   const lanes = LANES_RAW.map((lane) => ({
     id: lane.id,
     title: lane.title,
@@ -196,10 +280,32 @@ function getEntities() {
 function getSources() {
   const live = liveModel();
   if (live) {
+    // Live evidence describes the actual extract (counts + window) instead of
+    // the design-era EVIDENCE rows, whose figures only match synthetic mode.
+    const counts = live.sourceCounts;
     return {
       data: {
         generated_at: live.generated_at,
-        evidence: EVIDENCE,
+        evidence: [
+          {
+            label: "MYOB accounts cached",
+            value: String(counts.accounts),
+            basis: "Live GL cache · Account endpoint (this extract)",
+            confidence: "High",
+          },
+          {
+            label: "Journal lines in live GL cache",
+            value: String(counts.journal_lines),
+            basis: `JournalTransaction extract ${counts.from_date ?? "?"} → ${counts.to_date ?? "?"}`,
+            confidence: "High",
+          },
+          {
+            label: "Extract timestamp",
+            value: String(live.generated_at ?? "").slice(0, 10),
+            basis: "myob-live-gl-latest.json · 6-hourly sync",
+            confidence: "High",
+          },
+        ],
         freshness: [...FRESHNESS_FULL, live.freshnessFullEntry],
       },
       meta: live.meta,
@@ -321,7 +427,15 @@ function laneAnswer(lane, amount) {
       fmtMoney(Math.abs(after)) +
       " — not affordable in lane without CFO judgement on reallocation or restricted funding.";
   }
-  return { answer: opening + " " + verdictSentence, matched: { kind: "lane", id: lane.id } };
+  let answer = opening + " " + verdictSentence;
+  // Live lanes carry match_count; zero means no GL line matched the lane's
+  // terms, so the derived spent figure has no evidence behind it. Synthetic
+  // lanes leave match_count undefined and are never caveated.
+  if (lane.match_count === 0) {
+    answer +=
+      " Note: no GL lines matching this lane's terms were found in the current extract, so the spent figure is unverified — check source before relying on this verdict.";
+  }
+  return { answer, matched: { kind: "lane", id: lane.id } };
 }
 
 // Small-count words for the watchlist opening ("Two functions are at risk.").
@@ -426,20 +540,47 @@ function deterministicCopilot(q, live, meta) {
   return { data: generalAnswer(), meta };
 }
 
+// The "Historical data coverage" grounding block: what the Mongo history
+// store can and cannot answer, so the model states coverage limits plainly
+// instead of guessing. coverage is myobHistoryService.historyCoverage() —
+// null means the store is unavailable and the block must say so.
+function historyCoverageSection(coverage) {
+  if (!coverage) {
+    return "Historical data coverage: historical journal data is unavailable in this session, so only the current-FY figures above can be quoted. If a question asks about prior financial years, say plainly that historical data is unavailable.";
+  }
+  const floor = coverage.floorDate
+    ? `journal history is stored from ${coverage.floorDate}`
+    : "the journal history start date is unknown";
+  const visible = coverage.visibleFys.length > 0 ? coverage.visibleFys.join(", ") : "none yet";
+  const budgets =
+    coverage.budgetFys.length > 0
+      ? coverage.budgetFys.map((entry) => `${entry.fy} (source: ${entry.sources.join(", ")})`).join("; ")
+      : "none";
+  return [
+    `Historical data coverage: ${floor}.`,
+    `Prior financial years available to query: ${visible}.`,
+    `Financial years with budget rows loaded: ${budgets}.`,
+    "When a question goes beyond this coverage (earlier dates, years not listed, or budget comparisons for years without budget rows), state that coverage limit plainly instead of guessing.",
+  ].join(" ");
+}
+
 // Grounding facts for the LLM system prompt — serialised from the SAME
 // resolved model the deterministic path answers from (live derivation when a
 // cache is configured, otherwise the synthetic contract constants), so the
-// model can only cite figures the dashboard itself shows.
-function copilotSystemPrompt(live, deterministicAnswer) {
+// model can only cite figures the dashboard itself shows. coverage adds the
+// historical self-knowledge block (see historyCoverageSection).
+function copilotSystemPrompt(live, deterministicAnswer, coverage) {
   const lanes = live ? live.lanes : LANES_RAW;
   const functions = resolvedFunctions(live);
   const period = live ? live.period : PERIOD;
   const generatedAt = live ? live.generated_at : GENERATED_AT;
   const overs = functions.filter((fn) => fn.status === "over");
   const tights = functions.filter((fn) => fn.status === "tight");
+  // Live lanes carry match_count — surfaced so the model can weigh the GL
+  // evidence behind each spent figure (zero matches = unverified figure).
   const laneLines = lanes.map(
     (lane) =>
-      `- ${lane.title} (${lane.hint}): budget ${fmtMoney(lane.budget)}, spent ${fmtMoney(lane.spent)}, remaining ${fmtMoney(lane.budget - lane.spent)}, typical request ${fmtMoney(lane.default_request)}`,
+      `- ${lane.title} (${lane.hint}): budget ${fmtMoney(lane.budget)}, spent ${fmtMoney(lane.spent)}, remaining ${fmtMoney(lane.budget - lane.spent)}, typical request ${fmtMoney(lane.default_request)}${typeof lane.match_count === "number" ? `, matched GL lines ${lane.match_count}` : ""}`,
   );
   const functionLines = functions.map(
     (fn) =>
@@ -464,6 +605,8 @@ function copilotSystemPrompt(live, deterministicAnswer) {
     "",
     `Watchlist: ${watchlist}`,
     "",
+    historyCoverageSection(coverage),
+    "",
     "Affordability rules for a spending request against a lane: if the remainder after the request is at least the larger of $1,000 and 10% of the lane budget, it is likely affordable but should still be flagged for restricted-funding checks; if the remainder is smaller but not negative, it is possible but tight and must be flagged for CFO judgement and restricted-funding checks; if the request exceeds the remaining lane, it is not affordable in lane without CFO judgement on reallocation or restricted funding. Treat any request touching an over-budget or tight function the same way: recommend flagging it for CFO judgement.",
     "",
     "Rules: answer ONLY from the figures above and never invent, estimate or extrapolate numbers. All amounts are AUD; format them like $12,980. Reply in plain text only — no markdown, bullets or headings. Keep answers to 2-5 sentences. If something is not in this data (for example there is NO live cash balance, so cash on hand can never be quoted), say so plainly.",
@@ -471,6 +614,63 @@ function copilotSystemPrompt(live, deterministicAnswer) {
     `For reference, the dashboard's deterministic engine reads the latest question as: "${deterministicAnswer}"`,
   ].join("\n");
 }
+
+// OpenAI-format tool schemas for the historical derivations — attached to the
+// LLM call ONLY when the history store is reachable and at least one FY has
+// passed the mapping gate. Executors return the derivations' structured
+// results verbatim (including the { available: false } refusals) so the model
+// can only relay stored figures or stated coverage limits.
+const HISTORY_TOOLS = [
+  {
+    type: "function",
+    function: {
+      name: "fy_spend_by_function",
+      description: "Per-function expense totals for one visible prior financial year, including the Unmapped bucket.",
+      parameters: {
+        type: "object",
+        properties: { fy: { type: "string", description: "Financial year label, e.g. FY2025" } },
+        required: ["fy"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "budget_vs_actual",
+      description: "Per-account budget vs actual for one visible prior financial year that has budget rows loaded.",
+      parameters: {
+        type: "object",
+        properties: { fy: { type: "string", description: "Financial year label, e.g. FY2025" } },
+        required: ["fy"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "spend_trend",
+      description: "Spend for one function across a range of visible prior financial years.",
+      parameters: {
+        type: "object",
+        properties: {
+          functionName: { type: "string", description: 'Function name, e.g. EVANGELISM, or "Unmapped"' },
+          fromFy: { type: "string", description: "First financial year of the range, e.g. FY2024" },
+          toFy: { type: "string", description: "Last financial year of the range, e.g. FY2025" },
+        },
+        required: ["functionName", "fromFy", "toFy"],
+        additionalProperties: false,
+      },
+    },
+  },
+];
+
+const HISTORY_TOOL_EXECUTORS = {
+  fy_spend_by_function: (args) => history.fySpendByFunction(args.fy),
+  budget_vs_actual: (args) => history.budgetVsActual(args.fy),
+  spend_trend: (args) => history.spendTrend(args.functionName, args.fromFy, args.toFy),
+};
 
 // Most recent conversation turns forwarded to the LLM. validateMessages has
 // already bounded count and length; this cap just keeps the prompt small.
@@ -488,9 +688,15 @@ async function postCopilot(body) {
     return fallback;
   }
   try {
+    // Historical grounding + tools ride along only when the Mongo history
+    // store is reachable AND at least one FY passed the mapping gate; the
+    // coverage helper never throws, so the current-FY path is untouched.
+    const coverage = await history.historyCoverage();
+    const historyReady = Boolean(coverage) && coverage.visibleFys.length > 0;
     const answer = await chatComplete({
-      system: copilotSystemPrompt(live, fallback.data.answer),
+      system: copilotSystemPrompt(live, fallback.data.answer, coverage),
       messages: body.messages.slice(-COPILOT_LLM_TURNS).map((message) => ({ role: message.role, content: message.content })),
+      ...(historyReady ? { tools: HISTORY_TOOLS, executors: HISTORY_TOOL_EXECUTORS } : {}),
     });
     return { data: { answer, matched: fallback.data.matched }, meta };
   } catch (error) {
@@ -504,6 +710,10 @@ module.exports = {
   laneStatus,
   fmtMoney,
   extractAmount,
+  // exported for the copilot grounding/tool tests — not consumed by routes
+  copilotSystemPrompt,
+  HISTORY_TOOLS,
+  HISTORY_TOOL_EXECUTORS,
   getOverview,
   getFunctions,
   getDepartments,

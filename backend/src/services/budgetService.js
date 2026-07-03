@@ -197,9 +197,14 @@ function getApproved() {
   };
 }
 
+// Sync-run errors embedded by buildDepartmentReport (period_context.
+// source_errors) mark the report degraded, so auto mode falls back rather
+// than serving figures built off a partial extract. Reports written before
+// the field existed keep the previous behavior.
 function myobReportIsCurrent(data) {
   return (
     data?.period_context?.source_kind === "myob_live_gl_cache" &&
+    !data?.period_context?.source_errors?.length &&
     Array.isArray(data?.departments) &&
     data.departments.length > 0
   );

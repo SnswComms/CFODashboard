@@ -9,8 +9,9 @@ function getOverview(request, response) {
   send(response, commandCentreService.getOverview());
 }
 
-function getFunctions(request, response) {
-  send(response, commandCentreService.getFunctions());
+// Async: the observation line may call the local LLM (cached per data change).
+async function getFunctions(request, response) {
+  send(response, await commandCentreService.getFunctions());
 }
 
 function getDepartments(request, response) {

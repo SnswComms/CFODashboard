@@ -200,11 +200,18 @@ function buildCmfDocument(journalLines, { targetAccounts, accounts, generatedAt,
   };
 }
 
+// Per-line transaction evidence cap and excluded-account list cap in the
+// department report (parity with build_department_budget_myob_report.py).
+const DEPT_LINE_EVIDENCE_CAP = 8;
+const EXCLUDED_ACCOUNT_TOTALS_CAP = 30;
+
 // Department budget report consumed by budgetService.resolveDepartmentsPayload
 // when period_context.source_kind === "myob_live_gl_cache": approved budgets
 // come from THIS project's constants; actuals are GL journal expense/income
-// lines grouped by the first subaccount segment via PREFIX_TO_DEPT.
-function buildDepartmentReport(journalLines, accounts, { generatedAt, fromDate, toDate }) {
+// lines grouped by the first subaccount segment via PREFIX_TO_DEPT. Sync-run
+// errors ride period_context so consumers can tell a clean extract from a
+// degraded one without reading sync-status.json.
+function buildDepartmentReport(journalLines, accounts, { generatedAt, fromDate, toDate, errors = [] }) {
   const chart = {};
   for (const account of accounts) {
     const code = String(pickField(account, "AccountCD"));
@@ -246,7 +253,9 @@ function buildDepartmentReport(journalLines, accounts, { generatedAt, fromDate, 
     }
     const kind = accountKind(chart[String(line.account)] || {});
     if (kind === "other") {
-      const key = String(line.account) || "(none)";
+      // Keyed "code description" so the excluded list reads without a chart join.
+      const code = String(line.account);
+      const key = `${code} ${String(pickField(chart[code] || {}, "Description"))}`.trim() || "(none)";
       excludedAccountTotals[key] = round2((excludedAccountTotals[key] || 0) + toNumber(line.net_debit));
       continue;
     }
@@ -274,13 +283,25 @@ function buildDepartmentReport(journalLines, accounts, { generatedAt, fromDate, 
     const entry = department.lines.get(lineKey) || {
       line: `${line.account} ${line.account_description || ""}`.trim(),
       account: lineKey,
-      budget: null,
+      budget: 0,
       spent: 0,
       remaining: null,
       line_count: 0,
+      evidence: [],
     };
     entry.spent = round2(entry.spent + netDebit);
     entry.line_count += 1;
+    if (entry.evidence.length < DEPT_LINE_EVIDENCE_CAP) {
+      entry.evidence.push({
+        date: line.date,
+        period: line.period,
+        reference: line.reference,
+        batch: line.batch,
+        subaccount: line.subaccount,
+        description: line.line_description || line.header_description,
+        net_debit: toNumber(line.net_debit),
+      });
+    }
     department.lines.set(lineKey, entry);
   }
 
@@ -289,6 +310,22 @@ function buildDepartmentReport(journalLines, accounts, { generatedAt, fromDate, 
       const spent = round2(department.spent);
       const remaining = round2(department.budget - spent);
       const usedPct = department.budget > 0 ? round2((spent / department.budget) * 100) : null;
+      // Actual lines carry budget 0 / remaining -spent (MYOB budgets are not
+      // split per line); zero-actual departments fall back to the approved
+      // budget line list so the drilldown always has content.
+      let lineRows = [...department.lines.values()]
+        .map((entry) => ({ ...entry, remaining: round2(0 - entry.spent) }))
+        .sort((a, b) => b.spent - a.spent);
+      if (lineRows.length === 0 && approved.APPROVED_DEPARTMENT_LINES[department.name]) {
+        lineRows = approved.APPROVED_DEPARTMENT_LINES[department.name].map(([lineName, lineBudget]) => ({
+          line: lineName,
+          account: null,
+          budget: lineBudget,
+          spent: 0,
+          remaining: lineBudget,
+          line_count: 0,
+        }));
+      }
       return {
         name: department.name,
         budget: department.budget,
@@ -298,10 +335,36 @@ function buildDepartmentReport(journalLines, accounts, { generatedAt, fromDate, 
         status: departmentStatus(remaining, usedPct),
         income_budget: department.income_budget,
         income_actual: round2(department.income_actual),
-        lines: [...department.lines.values()].sort((a, b) => b.spent - a.spent),
+        lines: lineRows,
       };
     })
     .sort((a, b) => b.budget - a.budget);
+
+  // Unmapped expense prefixes surface as their own row so the department list
+  // reconciles to summary.spend instead of silently dropping spend.
+  if (Object.keys(unmappedPrefixTotals).length > 0) {
+    const unmappedSpent = round2(Object.values(unmappedPrefixTotals).reduce((sum, value) => sum + value, 0));
+    departmentRows.push({
+      name: "UNMAPPED",
+      budget: 0,
+      spent: unmappedSpent,
+      remaining: round2(0 - unmappedSpent),
+      used_pct: null,
+      status: departmentStatus(round2(0 - unmappedSpent), null),
+      income_budget: 0,
+      income_actual: 0,
+      lines: Object.entries(unmappedPrefixTotals)
+        .map(([prefix, prefixSpent]) => ({
+          line: `Unmapped prefix ${prefix}`,
+          account: prefix,
+          budget: 0,
+          spent: prefixSpent,
+          remaining: round2(0 - prefixSpent),
+          line_count: null,
+        }))
+        .sort((a, b) => b.spent - a.spent),
+    });
+  }
 
   // Labels and period bounds reflect the as-of cutoff, not any post-dated
   // journal that happens to be in the extract.
@@ -318,6 +381,8 @@ function buildDepartmentReport(journalLines, accounts, { generatedAt, fromDate, 
     source_modified: generatedAt,
     period_context: {
       source_kind: "myob_live_gl_cache",
+      source_errors: errors,
+      confidence: errors.length ? "degraded" : "high",
       budget_year: "2026",
       budget_period_label: approved.APPROVED_BUDGET_BASIS,
       actual_period_label: actualPeriodLabel,
@@ -343,7 +408,12 @@ function buildDepartmentReport(journalLines, accounts, { generatedAt, fromDate, 
     mapping: {
       subaccount_prefix_to_department: approved.PREFIX_TO_DEPT,
       unmapped_prefix_totals: unmappedPrefixTotals,
-      excluded_non_expense_account_totals: excludedAccountTotals,
+      // Largest excluded movements first, capped so the report stays readable.
+      excluded_non_expense_account_totals: Object.fromEntries(
+        Object.entries(excludedAccountTotals)
+          .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
+          .slice(0, EXCLUDED_ACCOUNT_TOTALS_CAP)
+      ),
       future_dated_excluded: { as_of: asOfDate, lines: futureExcludedCount, net_debit: futureExcludedTotal },
       notes: approved.MAPPING_NOTES,
     },
@@ -711,7 +781,11 @@ function probeRecord(result) {
 
 async function executeRun(session, run) {
   const generatedAt = nowIso();
-  const fromDate = config.myob.syncFromDate || defaultFromDate();
+  // An explicit request window (from the sync trigger) overrides the env
+  // default and the FY-start fallback; a requested to-date additionally bounds
+  // the journal fetch (an open-ended pull leaves it unset, as before).
+  const fromDate = run.from_date || config.myob.syncFromDate || defaultFromDate();
+  const requestedToDate = run.to_date || null;
   const errors = [];
   const counts = {};
 
@@ -765,15 +839,22 @@ async function executeRun(session, run) {
   // enriched with GL cash net movements — see below.)
 
   // c. paged JournalTransaction pull with Details from the FY window start.
+  // A THROWING fetch (not an empty result — a quiet ledger is legitimate)
+  // flags the run so every journal-derived cache write below is skipped and
+  // the previous good docs survive a transient MYOB outage.
   let journals = [];
+  let journalFetchFailed = false;
   try {
     journals = await myobClient.pagedFetch(session, "JournalTransaction", {
       expand: "Details",
-      filter: `TransactionDate ge datetimeoffset'${fromDate}'`,
+      filter:
+        `TransactionDate ge datetimeoffset'${fromDate}'` +
+        (requestedToDate ? ` and TransactionDate le datetimeoffset'${requestedToDate}'` : ""),
       top: 500,
       maxRows: config.myob.journalLimit,
     });
   } catch (error) {
+    journalFetchFailed = true;
     errors.push(`JournalTransaction: ${error.message}`);
   }
   const journalLines = flattenJournalLines(journals, accountDescriptions);
@@ -787,7 +868,9 @@ async function executeRun(session, run) {
     if (earliest === null || line.date < earliest) earliest = line.date;
     if (latest === null || line.date > latest) latest = line.date;
   }
-  const toDate = latest || dateOnly(generatedAt);
+  // Label/summary window end: the requested bound when one was given, else the
+  // latest journal date actually seen (an open-ended pull never overstates).
+  const toDate = requestedToDate || latest || dateOnly(generatedAt);
 
   // a (cont). GL cash net movements per 111xxx account (CashAccount is 404 on
   // this tenant) enrich the candidates, then the probe docs are written.
@@ -820,63 +903,75 @@ async function executeRun(session, run) {
     gl_cash_movement_warning: glCashMovements.warning,
   });
 
-  const liveGlDoc = {
-    generated_at: generatedAt,
-    source: "MYOB Advanced live GL extract (read-only GET Account/JournalTransaction, CFO Dashboard sync)",
-    from_date: fromDate,
-    to_date: toDate,
-    limits: { journal_limit: config.myob.journalLimit, bill_limit: 0, include_bills: false },
-    base_endpoint_family: config.myob.endpointFamily,
-    endpoint_status: {
-      Account: { status: endpoints.Account ? endpoints.Account.status : null, count: accounts.length },
-      JournalTransaction: {
-        status: endpoints.JournalTransaction ? endpoints.JournalTransaction.status : null,
-        journals_scanned: journals.length,
-        journal_lines: journalLines.length,
-        earliest_date: earliest,
-        latest_date: latest,
-      },
-    },
-    accounts,
-    journal_lines: journalLines,
-    bill_lines: [],
-    errors,
-  };
-  writeJsonFile(config.resolve("myobCache", LIVE_GL_LATEST_FILE), liveGlDoc);
-  writeJsonFile(config.resolve("myobCache", LIVE_GL_SUMMARY_FILE), {
-    generated_at: generatedAt,
-    source: liveGlDoc.source,
-    from_date: fromDate,
-    to_date: toDate,
-    limits: liveGlDoc.limits,
-    base_endpoint_family: liveGlDoc.base_endpoint_family,
-    endpoint_status: liveGlDoc.endpoint_status,
-    line_counts: { accounts: accounts.length, journal_lines: journalLines.length, bill_lines: 0 },
-    errors,
-  });
-
-  // d. CMF cash extract (net movements on the target accounts).
-  const cmfDoc = buildCmfDocument(journalLines, {
-    targetAccounts: config.myob.cmfTargetAccounts,
-    accounts,
-    generatedAt,
-    fromDate,
-    toDate,
-    journalsScanned: journals.length,
-  });
-  writeJsonFile(config.resolve("myobCache", CMF_LATEST_FILE), cmfDoc);
-  const { lines, ...cmfSummary } = cmfDoc;
-  writeJsonFile(config.resolve("myobCache", CMF_SUMMARY_FILE), cmfSummary);
-  counts.cmf_lines = cmfDoc.line_count;
-
-  // e. department budget report (needs the dashboards dir).
-  const departmentsPath = config.resolve("dashboards", DEPARTMENTS_MYOB_FILE);
-  if (departmentsPath) {
-    const departmentsDoc = buildDepartmentReport(journalLines, accounts, { generatedAt, fromDate, toDate });
-    writeJsonFile(departmentsPath, departmentsDoc);
-    counts.departments = departmentsDoc.departments.length;
+  if (journalFetchFailed) {
+    // Every cache below through the drilldowns is derived from this run's
+    // journals; writing them now would replace real actuals with empty "live"
+    // docs (the command-centre live model and department report would serve
+    // zeros as real). The previous run's files stay untouched.
+    errors.push("JournalTransaction fetch failed; journal-derived caches left untouched");
+    counts.skipped_writes = ["live-gl", "cmf-cash", "departments", "benefits", "account-drilldowns"];
   } else {
-    errors.push("departments: DASHBOARDS_DIR (or CFO_DATA_DIR) is not set; department report skipped");
+    const liveGlDoc = {
+      generated_at: generatedAt,
+      source: "MYOB Advanced live GL extract (read-only GET Account/JournalTransaction, CFO Dashboard sync)",
+      from_date: fromDate,
+      to_date: toDate,
+      limits: { journal_limit: config.myob.journalLimit, bill_limit: 0, include_bills: false },
+      base_endpoint_family: config.myob.endpointFamily,
+      endpoint_status: {
+        Account: { status: endpoints.Account ? endpoints.Account.status : null, count: accounts.length },
+        JournalTransaction: {
+          status: endpoints.JournalTransaction ? endpoints.JournalTransaction.status : null,
+          journals_scanned: journals.length,
+          journal_lines: journalLines.length,
+          earliest_date: earliest,
+          latest_date: latest,
+        },
+      },
+      accounts,
+      journal_lines: journalLines,
+      bill_lines: [],
+      errors,
+    };
+    writeJsonFile(config.resolve("myobCache", LIVE_GL_LATEST_FILE), liveGlDoc);
+    writeJsonFile(config.resolve("myobCache", LIVE_GL_SUMMARY_FILE), {
+      generated_at: generatedAt,
+      source: liveGlDoc.source,
+      from_date: fromDate,
+      to_date: toDate,
+      limits: liveGlDoc.limits,
+      base_endpoint_family: liveGlDoc.base_endpoint_family,
+      endpoint_status: liveGlDoc.endpoint_status,
+      line_counts: { accounts: accounts.length, journal_lines: journalLines.length, bill_lines: 0 },
+      errors,
+    });
+
+    // d. CMF cash extract (net movements on the target accounts).
+    const cmfDoc = buildCmfDocument(journalLines, {
+      targetAccounts: config.myob.cmfTargetAccounts,
+      accounts,
+      generatedAt,
+      fromDate,
+      toDate,
+      journalsScanned: journals.length,
+    });
+    writeJsonFile(config.resolve("myobCache", CMF_LATEST_FILE), cmfDoc);
+    const { lines, ...cmfSummary } = cmfDoc;
+    writeJsonFile(config.resolve("myobCache", CMF_SUMMARY_FILE), cmfSummary);
+    counts.cmf_lines = cmfDoc.line_count;
+
+    // e. department budget report (needs the dashboards dir). Only failures
+    // in the report's own inputs (chart accounts + journals) degrade its
+    // confidence; unrelated pulls (e.g. CashAccount) stay on sync-status.
+    const departmentsPath = config.resolve("dashboards", DEPARTMENTS_MYOB_FILE);
+    if (departmentsPath) {
+      const departmentErrors = errors.filter((message) => /^(Account|JournalTransaction):/.test(message));
+      const departmentsDoc = buildDepartmentReport(journalLines, accounts, { generatedAt, fromDate, toDate, errors: departmentErrors });
+      writeJsonFile(departmentsPath, departmentsDoc);
+      counts.departments = departmentsDoc.departments.length;
+    } else {
+      errors.push("departments: DASHBOARDS_DIR (or CFO_DATA_DIR) is not set; department report skipped");
+    }
   }
 
   // f. broad read-only cache: modest extra entity pulls plus a journal sample
@@ -903,30 +998,47 @@ async function executeRun(session, run) {
     }
   }
   const broadDoc = buildBroadCache({ generatedAt, fromDate, entityRecords, rawJournals: journals });
+  if (journalFetchFailed) {
+    // The entity pulls above are fresh, but this run has no journals — keep
+    // the previous cache's journal sample instead of overwriting it with an
+    // empty one (the journal-derived-caches-left-untouched promise above).
+    const previousBroad = readJsonFile(config.resolve("myobCache", BROAD_CACHE_FILE));
+    const previousKey =
+      previousBroad && previousBroad.endpoints
+        ? Object.keys(previousBroad.endpoints).find((key) => key.startsWith("JournalTransaction"))
+        : null;
+    if (previousKey) {
+      const emptyKey = Object.keys(broadDoc.endpoints).find((key) => key.startsWith("JournalTransaction"));
+      if (emptyKey) delete broadDoc.endpoints[emptyKey];
+      broadDoc.endpoints[previousKey] = previousBroad.endpoints[previousKey];
+    }
+  }
   writeJsonFile(config.resolve("myobCache", BROAD_CACHE_FILE), broadDoc);
   counts.broad_endpoints = Object.keys(broadDoc.endpoints).length;
   counts.broad_endpoints_ok = Object.values(broadDoc.endpoints).filter((record) => record.ok).length;
 
-  // g. benefits cache (account 312510) from the run's journal lines.
-  const benefitsDoc = buildBenefitsCache(journalLines, { generatedAt, fromDate, baseUrl: session.base });
-  writeJsonFile(config.resolve("myobCache", BENEFITS_CACHE_FILE), benefitsDoc);
-  counts.benefits_employees = benefitsDoc.derived.eligible_employee_count;
-  counts.benefits_transactions = benefitsDoc.derived.recent_transaction_count;
+  if (!journalFetchFailed) {
+    // g. benefits cache (account 312510) from the run's journal lines.
+    const benefitsDoc = buildBenefitsCache(journalLines, { generatedAt, fromDate, baseUrl: session.base });
+    writeJsonFile(config.resolve("myobCache", BENEFITS_CACHE_FILE), benefitsDoc);
+    counts.benefits_employees = benefitsDoc.derived.eligible_employee_count;
+    counts.benefits_transactions = benefitsDoc.derived.recent_transaction_count;
 
-  // h. key-account drilldowns (one file per account + the summary index).
-  const drilldowns = buildKeyAccountDrilldowns(journals, {
-    generatedAt,
-    fromDate,
-    journalLimit: config.myob.journalLimit,
-  });
-  for (const [code, doc] of Object.entries(drilldowns.accounts)) {
-    writeJsonFile(
-      config.resolve("myobCache", path.join("account-drilldowns", `myob-account-${code}-drilldown.json`)),
-      doc
-    );
+    // h. key-account drilldowns (one file per account + the summary index).
+    const drilldowns = buildKeyAccountDrilldowns(journals, {
+      generatedAt,
+      fromDate,
+      journalLimit: config.myob.journalLimit,
+    });
+    for (const [code, doc] of Object.entries(drilldowns.accounts)) {
+      writeJsonFile(
+        config.resolve("myobCache", path.join("account-drilldowns", `myob-account-${code}-drilldown.json`)),
+        doc
+      );
+    }
+    writeJsonFile(config.resolve("myobCache", DRILLDOWN_SUMMARY_FILE), drilldowns.summary);
+    counts.drilldown_accounts = drilldowns.summary.accounts.length;
   }
-  writeJsonFile(config.resolve("myobCache", DRILLDOWN_SUMMARY_FILE), drilldowns.summary);
-  counts.drilldown_accounts = drilldowns.summary.accounts.length;
 
   run.counts = counts;
   run.errors = errors;
@@ -968,14 +1080,25 @@ function getStatus() {
 
 // Kick off a run in-process without blocking the request. Returns
 // {started:false} when a run is already in flight (controller answers 409).
-function startSync({ company } = {}) {
+function startSync({ company, fromDate, toDate } = {}) {
   if (currentRun) return { started: false, status: getStatus() };
   if (!config.dirs.myobCache) {
     throw new UnavailableError("MYOB sync requires MYOB_CACHE_DIR (or CFO_DATA_DIR) to be set");
   }
 
   const companyName = company === "test" ? config.myob.companyTest : config.myob.company;
-  const run = { startedAt: nowIso(), finishedAt: null, ok: null, company: companyName, counts: {}, errors: [] };
+  const run = {
+    startedAt: nowIso(),
+    finishedAt: null,
+    ok: null,
+    company: companyName,
+    // Explicit request window echoed back on sync-status (null = env/FY default).
+    // executeRun reads these same fields to drive the journal fetch.
+    from_date: fromDate ?? null,
+    to_date: toDate ?? null,
+    counts: {},
+    errors: [],
+  };
   currentRun = { info: run };
   persistStatus(run);
 

@@ -108,3 +108,203 @@ input[type='range']::-moz-range-thumb {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+
+/* =========================================================================
+   RESPONSIVE FOUNDATION
+   Desktop (>=1025px) is untouched: every base rule below either matches the
+   existing inline styles exactly or is inert until a media query fires.
+   Media queries only ever ADD constraints at tablet (<=1024) and phone (<=640).
+   Inline styles cannot hold @media, so grids/padding that must respond carry
+   one of these classes IN ADDITION to (or replacing) their inline layout props.
+   ========================================================================= */
+
+/* ---- Grid utilities -------------------------------------------------------
+   Each utility restates its DESKTOP grid in the base rule so the class alone
+   drives layout (the fixer removes the matching inline gridTemplateColumns).
+   gap is left on the inline style so per-view gaps stay pixel-identical. */
+
+/* 4-column card grid: repeat(4,1fr) -> 2-col (tablet) -> 1-col (phone). */
+.cc-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+@media (max-width: 1024px) {
+  .cc-grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 640px) {
+  .cc-grid-4 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Asymmetric 2-col split (e.g. 1.55fr / 1fr): stacks to 1-col at tablet. */
+.cc-grid-2-wide {
+  display: grid;
+  grid-template-columns: 1.55fr 1fr;
+}
+@media (max-width: 1024px) {
+  .cc-grid-2-wide {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Even 2-col split (1fr / 1fr): stacks to 1-col at tablet. */
+.cc-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+@media (max-width: 1024px) {
+  .cc-grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Entity statement row (1.4fr 1fr 1fr 1fr): name row keeps full width, the
+   three metric cells wrap to a 3-col band at tablet, then 1-col at phone. */
+.cc-grid-entity {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 1fr;
+}
+@media (max-width: 1024px) {
+  .cc-grid-entity {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+  /* First child (the name/scope block) spans the whole row above the metrics. */
+  .cc-grid-entity > :first-child {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 640px) {
+  .cc-grid-entity {
+    grid-template-columns: 1fr;
+  }
+  .cc-grid-entity > :first-child {
+    grid-column: auto;
+  }
+}
+
+/* Generic stack: keeps whatever DESKTOP grid the element's inline style sets
+   (any column ratio — 1fr 1.4fr, 1.15fr 1fr, repeat(3,1fr), etc.) and only
+   collapses to a single column below tablet. Unlike the utilities above it does
+   NOT restate desktop columns, so the inline gridTemplateColumns stays the source
+   of truth at >=1025px (pixel-identical); the media query's !important is what
+   beats the inline value below tablet. Add this class and KEEP the inline
+   display:grid + gridTemplateColumns. */
+@media (max-width: 1024px) {
+  .cc-grid-stack {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ---- Horizontal-scroll wrapper -------------------------------------------
+   Wrap wide fixed-width flex "tables" (pressure watchlist, entity signals)
+   and any wide fixed-viewBox chart. On desktop it is a transparent pass-through
+   (visible overflow, no min-width imposed). Below tablet it becomes a scroll
+   container and forces its single child to keep a sensible minimum width so
+   columns don't crush — the page body itself never scrolls sideways. */
+.cc-scroll-x {
+  overflow: visible;
+}
+@media (max-width: 1024px) {
+  .cc-scroll-x {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .cc-scroll-x > * {
+    min-width: 680px;
+  }
+}
+
+/* ---- Shell: off-canvas sidebar drawer ------------------------------------
+   Desktop base rules reproduce the current fixed 250px sidebar in a flex row
+   exactly. Below tablet the sidebar becomes a fixed off-canvas drawer that
+   slides in when .cc-sidebar-open is toggled on it; a backdrop and a hamburger
+   button (both display:none on desktop) appear only in the mobile range. */
+
+.cc-shell {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.cc-sidebar {
+  width: 250px;
+  flex: none;
+  height: 100vh;
+}
+@media (max-width: 1024px) {
+  .cc-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 70;
+    transform: translateX(-100%);
+    transition: transform 0.22s ease;
+    box-shadow: 0 22px 48px rgba(27, 36, 48, 0.16);
+  }
+  .cc-sidebar.cc-sidebar-open {
+    transform: translateX(0);
+  }
+}
+
+/* Backdrop behind the open drawer — hidden on desktop, hidden when closed. */
+.cc-backdrop {
+  display: none;
+}
+@media (max-width: 1024px) {
+  .cc-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 65;
+    background: rgba(27, 36, 48, 0.34);
+    border: 0;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+  }
+}
+
+/* Hamburger toggle in the header — only visible below tablet. */
+.cc-hamburger {
+  display: none;
+}
+@media (max-width: 1024px) {
+  .cc-hamburger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    flex: none;
+    border: 1px solid #e7e5df;
+    background: #ffffff;
+    border-radius: 9px;
+    cursor: pointer;
+    padding: 0;
+  }
+}
+
+/* ---- Padding shrink -------------------------------------------------------
+   Header (18px 40px) and content (34px 40px 72px) horizontal padding is too
+   wide on phones. Base rules replay the desktop padding verbatim; only the
+   phone query narrows the horizontal component. */
+.cc-header-pad {
+  padding: 18px 40px;
+}
+@media (max-width: 640px) {
+  .cc-header-pad {
+    padding: 16px 18px;
+  }
+}
+
+.cc-content-pad {
+  padding: 34px 40px 72px;
+}
+@media (max-width: 640px) {
+  .cc-content-pad {
+    padding: 26px 18px 60px;
+  }
+}

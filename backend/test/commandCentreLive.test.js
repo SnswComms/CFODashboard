@@ -16,6 +16,9 @@ process.env.SYNTHETIC_DIR = "";
 // Copilot answers asserted below are the deterministic ones — keep the LLM
 // path off so the suite never touches the network.
 process.env.COPILOT_LLM_DISABLED = "1";
+// The fixture below is pinned to 2026-06-30; disable the staleness check so
+// the clean-health assertions hold whatever the real clock says.
+process.env.MYOB_STALE_AFTER_HOURS = "876000";
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
@@ -48,6 +51,9 @@ const LIVE_GL_DOC = {
     { kind: "JournalTransaction", date: "2026-04-05", period: "042026", branch: "AAV", account: "801000", account_description: "AAV catering", subaccount: "AAV-000", line_description: "Catering supplies", debit: 50000, credit: 0, net_debit: 50000 },
     { kind: "JournalTransaction", date: "2026-05-31", period: "052026", branch: "SNC", account: "405000", account_description: "Tithe income", subaccount: "ADM-000", line_description: "Tithe received", debit: 0, credit: 300000, net_debit: -300000 },
     { kind: "JournalTransaction", date: "2026-05-31", period: "052026", branch: "AAV", account: "401000", account_description: "AAV income", subaccount: "AAV-000", line_description: "Guest revenue", debit: 0, credit: 80000, net_debit: -80000 },
+    // Stray prior-FY-period adjustment (zero-value): its period-12 month must
+    // NOT stretch trend.as_of_month past the extract month (see derivation).
+    { kind: "JournalTransaction", date: "2026-02-01", period: "122025", branch: "SNC", account: "702000", account_description: "President travel", subaccount: "ADM-000", line_description: "Prior period adjustment", debit: 0, credit: 0, net_debit: 0 },
   ],
   bill_lines: [
     // Evidence only — must NOT count toward actuals.
@@ -126,6 +132,11 @@ test("GET /departments derives parent spend and keeps line math on parent used_p
     const evangelism = body.data.departments.find((dept) => dept.name === "Evangelism");
     assert.equal(evangelism.spent, 10000);
     assert.equal(evangelism.used_pct, 16);
+
+    // Additive live-only labelling: real period + provenance caption.
+    assert.deepEqual(body.data.period, { label: "FY2026 to date", elapsed_pct: 49 });
+    assert.ok(body.data.source_note.includes("2026-06-30"));
+    assert.ok(body.data.source_note.startsWith("Live MYOB GL actuals to "));
   });
 });
 
@@ -158,12 +169,30 @@ test("GET /overview recomputes KPIs and reflects the cache in freshness", async 
       value: "0",
       note: "None",
       tone: "good",
+      // Real per-month series (one entry per active month) backing the card's
+      // sparkline; the fixture has no function over budget in any month.
+      spark: [0, 0, 0, 0, 0],
     });
+    // Net KPI carries the cumulative monthly net series for its sparkline.
+    assert.deepEqual(body.data.kpis[0].spark.length, 5);
+    assert.equal(body.data.kpis[0].spark[4], 116000);
+    // Clean sync (no cache errors, no failed run, not stale): data health
+    // reads Live/good and meta.warnings is empty.
     assert.equal(body.data.kpis[3].value, "Live");
+    assert.equal(body.data.kpis[3].tone, "good");
+    assert.deepEqual(body.meta.warnings, []);
 
     // Backward-compatible payload: original fields intact, live fields added.
     assert.equal(body.data.dash_cards.length, 8);
-    assert.equal(body.data.alerts.length, 3);
+    // Live mode derives alerts; no overs/tights/warnings in this fixture, so
+    // the single all-clear card replaces the three design alerts.
+    assert.deepEqual(body.data.alerts, [
+      {
+        title: "No alerts",
+        body: "All functions at or under elapsed-year pace and the MYOB sync is healthy.",
+        tone: "good",
+      },
+    ]);
     const live = body.data.freshness.find((f) => f.name === "MYOB live GL cache");
     assert.deepEqual(live, { name: "MYOB live GL cache", status: "Current", tone: "good" });
     assert.deepEqual(body.data.totals, { income: 380000, expense: 264000, net: 116000 });
@@ -175,23 +204,63 @@ test("GET /overview recomputes KPIs and reflects the cache in freshness", async 
   });
 });
 
-test("GET /sources appends the live cache to freshness", async () => {
+test("GET /sources serves extract-derived evidence and appends the live cache to freshness", async () => {
   await withServer(async (base) => {
     const { status, body } = await requestJson(base, "/api/command-centre/sources");
     assert.equal(status, 200);
     assertLiveMeta(body);
-    assert.equal(body.data.evidence.length, 4);
+    // Evidence rows describe the fixture extract itself (the fixture has no
+    // to_date, so the window's end renders as "?").
+    assert.deepEqual(body.data.evidence, [
+      {
+        label: "MYOB accounts cached",
+        value: "6",
+        basis: "Live GL cache · Account endpoint (this extract)",
+        confidence: "High",
+      },
+      {
+        label: "Journal lines in live GL cache",
+        value: "8",
+        basis: "JournalTransaction extract 2026-01-01 → ?",
+        confidence: "High",
+      },
+      {
+        label: "Extract timestamp",
+        value: "2026-06-30",
+        basis: "myob-live-gl-latest.json · 6-hourly sync",
+        confidence: "High",
+      },
+    ]);
     const live = body.data.freshness.find((f) => f.name === "MYOB live GL cache");
     assert.deepEqual(live, { name: "MYOB live GL cache", status: "Current", tone: "good", note: "Extracted 2026-06-30" });
   });
 });
 
-test("GET /lanes keeps its constant-based contract even in live mode", async () => {
+test("GET /lanes serves live-derived spend with matched-GL-line evidence", async () => {
   await withServer(async (base) => {
     const { status, body } = await requestJson(base, "/api/command-centre/lanes");
     assert.equal(status, 200);
-    assert.equal(body.meta.dataSource, "synthetic");
-    assert.equal(body.data.lanes[0].spent, 44020); // design figure, unchanged
+    assertLiveMeta(body);
+
+    const byId = Object.fromEntries(body.data.lanes.map((lane) => [lane.id, lane]));
+    // Evangelism: 12,000 debit - 2,000 credit refund, both journal lines cited.
+    assert.equal(byId.evangelism.spent, 10000);
+    assert.equal(byId.evangelism.remaining, 52000);
+    assert.equal(byId.evangelism.match_count, 2);
+    assert.deepEqual(byId.evangelism.matched_lines, [
+      { date: "2026-01-15", account: "703430", description: "Evangelism supplies", amount: 12000 },
+      { date: "2026-02-10", account: "703430", description: "Evangelism refund", amount: -2000 },
+    ]);
+    // President: the haystack includes the ADMINISTRATION department name and
+    // the account description, so the travel line AND the zero-value prior
+    // period adjustment both count as evidence (spent unchanged at 4,000).
+    assert.equal(byId.president.spent, 4000);
+    assert.equal(byId.president.match_count, 2);
+    assert.deepEqual(byId.president.matched_lines.map((line) => line.amount), [4000, 0]);
+    // Youth: no GL activity in the fixture — zero spent, zero evidence.
+    assert.equal(byId.youth.spent, 0);
+    assert.equal(byId.youth.match_count, 0);
+    assert.deepEqual(byId.youth.matched_lines, []);
   });
 });
 
@@ -223,5 +292,14 @@ test("POST /copilot cites live-derived lane and function figures", async () => {
     });
     assert.deepEqual(watch.body.data.matched, { kind: "watchlist", id: null });
     assert.match(watch.body.data.answer, /No functions are at risk/);
+
+    // Youth has no matching GL lines in the fixture (match_count 0), so the
+    // lane verdict carries the unverified-spend caveat.
+    const youth = await requestJson(base, "/api/command-centre/copilot", {
+      method: "POST",
+      body: { messages: [{ role: "user", content: "Can Youth absorb a $3,000 request?" }] },
+    });
+    assert.deepEqual(youth.body.data.matched, { kind: "lane", id: "youth" });
+    assert.match(youth.body.data.answer, /spent figure is unverified — check source/);
   });
 });

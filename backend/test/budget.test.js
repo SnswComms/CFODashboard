@@ -229,6 +229,49 @@ test("GET /api/budget/departments prefers a current MYOB report in auto mode", a
   }
 });
 
+test("GET /api/budget/departments skips a degraded MYOB report in auto mode", async () => {
+  const myobFile = path.join(dashboardsDir, "department-budget-myob-data.json");
+  fs.writeFileSync(
+    myobFile,
+    JSON.stringify({
+      generated_at: "2026-06-30T10:00:00",
+      source: "test myob",
+      source_modified: null,
+      period_context: {
+        budget_year: "2026",
+        source_kind: "myob_live_gl_cache",
+        source_errors: ["JournalTransaction: HTTP 500"],
+        confidence: "degraded",
+        actual_period_label: "MYOB actuals 2026-01-01 to 2026-06-30",
+      },
+      departments: [
+        {
+          name: "FIELD", budget: 3177120, spent: 1, remaining: 3177119,
+          used_pct: 0, status: "ok", income_budget: 0, income_actual: 0, lines: [],
+        },
+      ],
+      summary: { income: 0, spend: 1, net: 0, cash: [] },
+    })
+  );
+  try {
+    await withServer(async (base) => {
+      // embedded sync errors mark the report not-current: auto falls back
+      const auto = await requestJson(base, "/api/budget/departments");
+      assert.equal(auto.status, 200);
+      assert.equal(auto.body.meta.dataSource, "synthetic");
+      assert.equal(auto.body.data.departments.length, 12);
+
+      // explicit ?source=myob still serves the degraded file for inspection
+      const explicit = await requestJson(base, "/api/budget/departments?source=myob");
+      assert.equal(explicit.body.meta.dataSource, "live-cache");
+      assert.equal(explicit.body.data.departments[0].spent, 1);
+      assert.equal(explicit.body.data.period_context.confidence, "degraded");
+    });
+  } finally {
+    fs.unlinkSync(myobFile);
+  }
+});
+
 test("GET /api/budget/departments/mapping falls back to constants", async () => {
   await withServer(async (base) => {
     const { status, body } = await requestJson(base, "/api/budget/departments/mapping");

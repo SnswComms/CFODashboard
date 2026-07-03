@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { ToastProvider } from "@/components/Toast";
 import "./globals.css";
@@ -18,6 +18,11 @@ export const metadata: Metadata = {
   title: "CFO Command Centre",
   description:
     "CFO Command Centre — South NSW Conference finance workspace.",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({

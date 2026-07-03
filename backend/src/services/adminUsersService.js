@@ -4,6 +4,7 @@ const { fromNodeHeaders } = require("better-auth/node");
 
 const { auth, markWelcomePending } = require("../auth");
 const { HttpError, BadRequestError } = require("../lib/errors");
+const mailer = require("../lib/mailer");
 
 const VALID_ROLES = new Set(["admin", "user"]);
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -82,7 +83,16 @@ async function createUser(request) {
     name: name.trim(),
     role,
     emailVerified: false,
+    // Self-describing send status: false means the verification/welcome mails
+    // above degraded to logged dry-runs (EMAIL_DRY_RUN or missing Gmail creds).
+    mailLive: mailer.mailStatus().live,
   };
 }
 
-module.exports = { createUser };
+// Mailer mode snapshot for GET /api/admin/mail-status — pure passthrough, no
+// network I/O (see ../lib/mailer).
+function mailStatus() {
+  return mailer.mailStatus();
+}
+
+module.exports = { createUser, mailStatus };

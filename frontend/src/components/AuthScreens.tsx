@@ -186,7 +186,8 @@ export default function AuthScreens({ onAuthed }: { onAuthed: () => void }) {
   const [linkSent, setLinkSent] = useState(false);
   const [passwordSet, setPasswordSet] = useState(false);
 
-  // URL intake: the emailed links land back on "/" with query params.
+  // URL intake: the emailed links land on "/" with query params, and the root
+  // page forwards them to /overview — read them from wherever we mounted.
   //  - /?screen=set-password&token=<t>   -> set-new-password screen (reset flow)
   //  - /?verified=1&error=<CODE>         -> confirm screen (expired/invalid verification link)
   //  - /?error=<CODE>                    -> reset screen with an expiry error
@@ -199,6 +200,10 @@ export default function AuthScreens({ onAuthed }: { onAuthed: () => void }) {
     const verified = params.get('verified') === '1';
 
     if (wantsSetPassword && token) {
+      // Deliberate mount-time sync from an external system (the URL). Lazy
+      // useState initializers can't read window.location here because the
+      // component is also pre-rendered on the server.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setResetToken(token);
       setScreen('set-password');
     } else if (err) {
@@ -222,7 +227,9 @@ export default function AuthScreens({ onAuthed }: { onAuthed: () => void }) {
     }
 
     if (wantsSetPassword || token || err || verified) {
-      window.history.replaceState(null, '', '/');
+      // Strip the consumed auth params but keep the current route ("/" query
+      // strings are forwarded to /overview by the root redirect).
+      window.history.replaceState(null, '', window.location.pathname);
     }
     // toast is a stable context api; the effect still runs once on mount.
   }, [toast]);
@@ -489,7 +496,15 @@ export default function AuthScreens({ onAuthed }: { onAuthed: () => void }) {
                   <h2 style={{ fontFamily: FONT, fontWeight: 400, fontSize: 21, margin: '0 0 8px' }}>
                     Check your inbox
                   </h2>
-                  <p style={{ fontSize: 13, color: '#757C86', margin: '0 0 22px', lineHeight: 1.55 }}>
+                  <p
+                    style={{
+                      fontSize: 13,
+                      color: '#757C86',
+                      margin: '0 0 22px',
+                      lineHeight: 1.55,
+                      overflowWrap: 'break-word',
+                    }}
+                  >
                     If an account exists for {email}, a password reset link is on its way. The link
                     expires in 60 minutes.
                   </p>
@@ -507,7 +522,15 @@ export default function AuthScreens({ onAuthed }: { onAuthed: () => void }) {
               <h2 style={{ fontFamily: FONT, fontWeight: 400, fontSize: 21, margin: '0 0 8px' }}>
                 Confirm your email
               </h2>
-              <p style={{ fontSize: 13, color: '#757C86', margin: '0 0 22px', lineHeight: 1.55 }}>
+              <p
+                style={{
+                  fontSize: 13,
+                  color: '#757C86',
+                  margin: '0 0 22px',
+                  lineHeight: 1.55,
+                  overflowWrap: 'break-word',
+                }}
+              >
                 {email
                   ? `We sent a confirmation link to ${email}. Click it to activate your access to the command centre.`
                   : 'We sent a confirmation link to your email. Click it to activate your access to the command centre.'}

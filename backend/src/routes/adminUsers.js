@@ -11,4 +11,8 @@ const router = express.Router();
 // straight to Better Auth's own /api/auth/admin/* endpoints.
 router.post("/api/admin/users", requireRole("admin"), asyncHandler(adminUsersController.createUser));
 
+// Mailer mode probe (no network I/O): lets the Admin UI warn when invitation
+// emails would silently degrade to logged dry-runs.
+router.get("/api/admin/mail-status", requireRole("admin"), asyncHandler(adminUsersController.mailStatus));
+
 module.exports = router;

@@ -2,12 +2,13 @@
 
 // "User management" view — admin-only user administration per AUTH-CONTRACT §5.
 // Data: Better Auth admin client (authClient.admin.*) for list/role/ban/sessions/remove,
-// authClient.requestPasswordReset for reset links, and the dedicated backend endpoint
-// POST /api/admin/users (requireRole('admin')) for the create-user invitation flow.
+// authClient.requestPasswordReset for reset links, and the dedicated backend endpoints
+// POST /api/admin/users (requireRole('admin')) for the create-user invitation flow and
+// GET /api/admin/mail-status for the "email not configured" warning banner.
 // Visual idiom matches the existing views: white cards on #FAFAF8, border #E7E5DF,
 // radius 12, Poppins via FONT, status pills, Departments-style modal.
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { authClient } from '@/lib/authClient';
 import { FONT } from '@/lib/format';
@@ -123,9 +124,9 @@ const menuItemStyle = (disabled: boolean, danger = false): CSSProperties => ({
 
 const fieldLabel: CSSProperties = { fontSize: 12, color: '#5B626C', marginBottom: 6 };
 
-const bannerStyle = (tone: 'good' | 'bad'): CSSProperties => ({
-  background: tone === 'good' ? '#EEF3EF' : '#F7ECEA',
-  color: tone === 'good' ? '#3E7A55' : '#A8443B',
+const bannerStyle = (tone: 'good' | 'bad' | 'warn'): CSSProperties => ({
+  background: tone === 'good' ? '#EEF3EF' : tone === 'warn' ? 'rgba(201,162,75,.12)' : '#F7ECEA',
+  color: tone === 'good' ? '#3E7A55' : tone === 'warn' ? '#8A6A2A' : '#A8443B',
   borderRadius: 8,
   padding: '10px 14px',
   fontSize: 12.5,
@@ -164,6 +165,17 @@ export default function Admin() {
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [modal, setModal] = useState<Modal>(null);
+  const [mailOffline, setMailOffline] = useState(false);
+
+  // server-side search state: matching rows tagged with the query they answer
+  // (null = not searching, fall back to the recent-100 listing), an in-flight
+  // flag, and a degraded flag for when the server search failed and only the
+  // client-side filter over the recent listing is in effect. searchSeq guards
+  // against a slow response overwriting the results of a newer query.
+  const [serverRows, setServerRows] = useState<{ query: string; rows: AdminUser[] } | null>(null);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchDegraded, setSearchDegraded] = useState(false);
+  const searchSeq = useRef(0);
 
   // create-user modal state
   const [newName, setNewName] = useState('');
@@ -195,8 +207,95 @@ export default function Admin() {
   }, []);
 
   useEffect(() => {
+    // Deliberate initial fetch-on-mount: load() syncs table state from the
+    // backend (an external system); its state updates land after the await.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
   }, [load]);
+
+  // One-shot mail-status probe: warn when the server cannot send email. Any
+  // failure (endpoint missing, non-200, network) silently shows nothing.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/admin/mail-status');
+        if (!res.ok) return;
+        const body = (await res.json()) as { data?: { live?: boolean } } | null;
+        if (!cancelled && body?.data?.live === false) setMailOffline(true);
+      } catch {
+        /* show nothing */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Server-side search across ALL accounts. searchField is single-valued, so
+  // query name and email in parallel and merge by id, newest first, capped at
+  // LIST_LIMIT. If either leg fails the merged result would be incomplete, so
+  // fall back to the client-side filter over the recent listing (serverRows =
+  // null) and flag the coverage as degraded.
+  const runSearch = useCallback(async (query: string) => {
+    const seq = ++searchSeq.current;
+    if (!query) {
+      setServerRows(null);
+      setSearchDegraded(false);
+      setSearchLoading(false);
+      return;
+    }
+    setSearchLoading(true);
+    try {
+      const [byName, byEmail] = await Promise.all(
+        (['name', 'email'] as const).map((searchField) =>
+          authClient.admin.listUsers({
+            query: {
+              searchValue: query,
+              searchField,
+              searchOperator: 'contains',
+              limit: LIST_LIMIT,
+              sortBy: 'createdAt',
+              sortDirection: 'desc',
+            },
+          }),
+        ),
+      );
+      if (seq !== searchSeq.current) return;
+      if (byName.error || byEmail.error) {
+        setServerRows(null);
+        setSearchDegraded(true);
+      } else {
+        const merged = new Map<string, AdminUser>();
+        for (const res of [byName, byEmail]) {
+          const data = res.data as unknown as { users?: AdminUser[] } | null;
+          for (const u of data?.users ?? []) merged.set(u.id, u);
+        }
+        setServerRows({
+          query,
+          rows: [...merged.values()]
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+            .slice(0, LIST_LIMIT),
+        });
+        setSearchDegraded(false);
+      }
+    } catch {
+      if (seq === searchSeq.current) {
+        setServerRows(null);
+        setSearchDegraded(true);
+      }
+    }
+    if (seq === searchSeq.current) setSearchLoading(false);
+  }, []);
+
+  // Debounced (~300ms) trigger for the server-side search as the admin types.
+  useEffect(() => {
+    const query = search.trim();
+    const t = setTimeout(() => {
+      void runSearch(query);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [search, runSearch]);
 
   const closeModal = () => {
     setModal(null);
@@ -213,6 +312,15 @@ export default function Admin() {
     setModal({ kind: 'create' });
   };
 
+  // Refreshes the table after a mutation: the recent listing always, plus the
+  // server-side search results when a search is active (otherwise the table
+  // would keep rendering the pre-mutation serverRows snapshot).
+  const refresh = async () => {
+    await load();
+    const query = search.trim();
+    if (query) await runSearch(query);
+  };
+
   // Runs a Better Auth admin client call, surfaces the outcome as a toast,
   // and refreshes the table on success.
   const runAction = async (
@@ -227,7 +335,7 @@ export default function Admin() {
         toast.error(res.error.message || `Could not ${label}.`, 'User management');
       } else {
         toast.success(successText);
-        await load();
+        await refresh();
       }
     } catch {
       toast.error(`Could not ${label}.`, 'User management');
@@ -260,12 +368,28 @@ export default function Admin() {
         }
         setModalError(msg);
       } else {
+        // The 201 envelope data carries mailLive so we can warn when the
+        // welcome email could not actually go out.
+        let mailLive = true;
+        try {
+          const body = (await res.json()) as { data?: { mailLive?: boolean } } | null;
+          if (body?.data?.mailLive === false) mailLive = false;
+        } catch {
+          /* body optional — assume mail is live */
+        }
         closeModal();
-        toast.success(
-          `${email} will receive a welcome email to set their password.`,
-          'Invitation sent',
-        );
-        await load();
+        if (mailLive) {
+          toast.success(
+            `${email} will receive a welcome email to set their password.`,
+            'Invitation sent',
+          );
+        } else {
+          toast.error(
+            `${email} was created, but the invitation email could NOT be sent — email is not configured on the server. Send them a password link once email is set up.`,
+            'Invitation not sent',
+          );
+        }
+        await refresh();
       }
     } catch {
       setModalError('Could not reach the server. Check that the backend is running.');
@@ -318,8 +442,15 @@ export default function Admin() {
     );
 
   // ---- derived rows ----
+  // While searching, the base set is the server result (all accounts) — but
+  // only once it answers the CURRENT query; until it lands, or if it failed,
+  // it's the recent-100 listing (stale results for a previous query must not
+  // hide matches present in the loaded list). The instant client-side filter
+  // overlays both so typing always feels immediate.
   const q = search.toLowerCase().trim();
-  const rows = users.filter(
+  const base =
+    q && serverRows !== null && serverRows.query.toLowerCase() === q ? serverRows.rows : users;
+  const rows = base.filter(
     (u) => !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q),
   );
 
@@ -355,6 +486,15 @@ export default function Admin() {
         </div>
       </div>
 
+      {mailOffline && (
+        <div style={bannerStyle('warn')}>
+          <span>
+            Email sending is not configured on the server — invitations, password links and
+            notifications will NOT be delivered.
+          </span>
+        </div>
+      )}
+
       {loadError && (
         <div style={bannerStyle('bad')}>
           <span>{loadError}</span>
@@ -371,6 +511,7 @@ export default function Admin() {
       )}
 
       {/* users table */}
+      <div className="cc-scroll-x">
       <div style={cardStyle}>
         {loading && (
           <div style={{ padding: '40px 20px', textAlign: 'center', fontSize: 13, color: '#9AA0A8' }}>
@@ -380,11 +521,17 @@ export default function Admin() {
         {!loading && rows.length === 0 && (
           <div style={{ padding: '48px 20px', textAlign: 'center' }}>
             <div style={{ fontSize: 14, color: '#39424F', marginBottom: 6 }}>
-              {q ? 'No accounts match your search.' : 'No accounts yet.'}
+              {q
+                ? searchLoading
+                  ? 'Searching all accounts…'
+                  : 'No accounts match your search.'
+                : 'No accounts yet.'}
             </div>
             <div style={{ fontSize: 12.5, color: '#9AA0A8' }}>
               {q
-                ? 'Try a different name or email.'
+                ? searchLoading
+                  ? 'One moment.'
+                  : 'Try a different name or email.'
                 : 'Use “Add user” to invite the first team member.'}
             </div>
           </div>
@@ -594,10 +741,22 @@ export default function Admin() {
           </table>
         )}
       </div>
+      </div>
 
-      {!loading && total > LIST_LIMIT && (
+      {!loading && !q && total > LIST_LIMIT && (
         <p style={{ fontSize: 12.5, color: '#9AA0A8', margin: '14px 0 0' }}>
-          Showing the {LIST_LIMIT} most recent accounts of {total}. Use search to narrow the list.
+          Showing the {LIST_LIMIT} most recent accounts of {total}. Search covers all accounts.
+        </p>
+      )}
+      {!loading && !!q && (
+        <p style={{ fontSize: 12.5, color: '#9AA0A8', margin: '14px 0 0' }}>
+          {searchLoading
+            ? 'Searching all accounts…'
+            : searchDegraded
+              ? `Search is unavailable — showing matches from the ${LIST_LIMIT} most recent accounts only.`
+              : `Search covers all accounts${
+                  rows.length >= LIST_LIMIT ? ` — showing the first ${LIST_LIMIT} matches` : ''
+                }.`}
         </p>
       )}
 

@@ -11,9 +11,7 @@ async function connectMongo() {
     return null;
   }
   if (db) return db;
-  client = new MongoClient(config.mongoUri, {
-    serverSelectionTimeoutMS: 5000,
-  });
+  client = new MongoClient(config.mongoUri, config.mongoClientOptions);
   await client.connect();
   db = client.db(config.mongoDb);
   await db.command({ ping: 1 });

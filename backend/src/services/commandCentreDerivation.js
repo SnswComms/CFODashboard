@@ -101,24 +101,48 @@ function normalizeLines(doc) {
         .filter(Boolean)
         .join(" ")
         .toLowerCase(),
+      // Evidence fields for lane matched_lines (additive — only the lane
+      // evidence below reads them, aggregation stays on the fields above).
+      date: raw.date ?? null,
+      account: String(raw.account ?? ""),
+      description: String(raw.line_description || raw.header_description || raw.account_description || ""),
     });
   }
   return lines;
 }
 
 // Lane actuals via the DECISION_LANES term contract: expense lines whose
-// department matches a function term and whose descriptions carry a detail
-// term (excluding the lane's exclude terms).
-function laneSpentFrom(lines, def) {
+// department matches a function term and whose haystack carries a detail term
+// (excluding the lane's exclude terms). The haystack is department name +
+// descriptions — Python parity: generate_cfo_budget_dashboard.py:316 builds
+// hay from the function name too, so e.g. every EVANGELISM-dept expense line
+// counts toward the evangelism lane. Returns the matched-line evidence
+// alongside the sum so /lanes and the copilot can show WHICH GL lines back
+// the figure (capped sample; match_count is always the full tally).
+const LANE_MATCHED_LINES_CAP = 8;
+
+function laneMatchesFrom(lines, def) {
   let sum = 0;
+  let match_count = 0;
+  const matched_lines = [];
   for (const line of lines) {
     if (line.kind !== "expense" || !line.dept) continue;
     if (!def.function_terms.some((term) => line.dept.includes(term))) continue;
-    if (def.exclude_terms.some((term) => line.text.includes(term))) continue;
-    if (!def.detail_terms.some((term) => line.text.includes(term))) continue;
+    const hay = line.dept.toLowerCase() + " " + line.text;
+    if (def.exclude_terms.some((term) => hay.includes(term))) continue;
+    if (!def.detail_terms.some((term) => hay.includes(term))) continue;
     sum += line.amount;
+    match_count += 1;
+    if (matched_lines.length < LANE_MATCHED_LINES_CAP) {
+      matched_lines.push({
+        date: line.date,
+        account: line.account,
+        description: line.description,
+        amount: Math.round(line.amount),
+      });
+    }
   }
-  return Math.round(sum);
+  return { spent: Math.round(sum), match_count, matched_lines };
 }
 
 // Calendar-year elapsed % at the cache timestamp (the design constant 42 is
@@ -152,13 +176,26 @@ function observationFrom(overs, tights) {
   return joined + ". Every other function still sits at or under elapsed-year pace.";
 }
 
-// doc: parsed live-gl cache; meta: the resolver's live-cache meta (kept on the
-// model so every getter can return it unchanged).
-function buildLiveModel(doc, meta) {
+// doc: parsed live-gl cache; meta: the resolver's live-cache meta, returned
+// with the health warnings attached so every getter's envelope carries
+// meta.warnings. warnings/stale come from the service's sync-health checks
+// (commandCentreService.liveHealth) and drive the data-health KPI, the live
+// freshness entry and the derived alerts below.
+function buildLiveModel(doc, meta, { warnings = [], stale = false } = {}) {
   const lines = normalizeLines(doc);
   const generated_at = meta.generated_at ?? doc.generated_at ?? null;
 
+  // Extract-level provenance for the /sources evidence registry: how much of
+  // the GL cache this derivation saw, and the extract window it covers.
+  const sourceCounts = {
+    accounts: (doc.accounts || []).length,
+    journal_lines: (doc.journal_lines || []).length,
+    from_date: doc.from_date ?? null,
+    to_date: doc.to_date ?? null,
+  };
+
   const deptSpent = new Map();
+  const deptMonthlySpent = new Map();
   const entityAgg = new Map(ENT_DEFS.map((entity) => [entity.name, { income: 0, expense: 0 }]));
   const monthly = { income: Array(12).fill(0), expense: Array(12).fill(0) };
   let income = 0;
@@ -172,6 +209,14 @@ function buildLiveModel(doc, meta) {
     if (entity) entity[line.kind] += line.amount;
     if (line.kind === "expense" && line.dept) {
       deptSpent.set(line.dept, (deptSpent.get(line.dept) || 0) + line.amount);
+      if (line.month) {
+        let byMonth = deptMonthlySpent.get(line.dept);
+        if (!byMonth) {
+          byMonth = Array(12).fill(0);
+          deptMonthlySpent.set(line.dept, byMonth);
+        }
+        byMonth[line.month - 1] += line.amount;
+      }
     }
     if (line.month) monthly[line.kind][line.month - 1] += line.amount;
   }
@@ -218,7 +263,9 @@ function buildLiveModel(doc, meta) {
 
   const lanes = LANES_RAW.map((lane) => {
     const def = DECISION_LANES.find((candidate) => candidate.id === (LANE_DECISION_IDS[lane.id] || lane.id));
-    return { ...lane, spent: def ? laneSpentFrom(lines, def) : lane.spent };
+    if (!def) return { ...lane, match_count: 0, matched_lines: [] };
+    const { spent, match_count, matched_lines } = laneMatchesFrom(lines, def);
+    return { ...lane, spent, match_count, matched_lines };
   });
 
   const overs = functions.filter((fn) => fn.status === "over");
@@ -254,26 +301,14 @@ function buildLiveModel(doc, meta) {
     },
   ];
 
-  const overviewKpis = [
-    opKpis[2],
-    OVERVIEW_KPIS[1], // Approved surplus · FY26 — board constants either way
-    {
-      eyebrow: "Functions over budget",
-      value: String(overs.length),
-      note: overs.map((fn) => fn.name).join(" · ") || "None",
-      tone: overs.length > 0 ? "warn" : "good",
-    },
-    { eyebrow: "Data health", value: "Live", note: "MYOB GL cache · " + String(generated_at ?? "").slice(0, 10), tone: "good" },
-  ];
-
-  const composition = [
-    { label: "Income", approved: APPROVED_TOTALS.income, spent: income, tone: "good" },
-    { label: "Expense", approved: APPROVED_TOTALS.expense, spent: expense, tone: "neutral" },
-  ];
-
   // Cumulative monthly actuals for the overview trend chart (months past the
-  // latest activity stay null so the frontend can keep projecting).
-  const activeMonths = lines.map((line) => line.month).filter(Boolean);
+  // latest activity stay null so the frontend can keep projecting). Stray
+  // prior-period adjustment lines (the tenant carries e.g. period 12 of the
+  // previous FY) must not stretch the actuals window past the extract date,
+  // so only months at or before the extract month count as active.
+  const extractedAt = new Date(generated_at ?? "");
+  const extractMonth = Number.isNaN(extractedAt.getTime()) ? 12 : extractedAt.getUTCMonth() + 1;
+  const activeMonths = lines.map((line) => line.month).filter((m) => m && m <= extractMonth);
   const asOfMonth = activeMonths.length > 0 ? Math.max(...activeMonths) : null;
   let runningIncome = 0;
   let runningExpense = 0;
@@ -290,12 +325,99 @@ function buildLiveModel(doc, meta) {
   }
   const trend = { as_of_month: asOfMonth, months: trendMonths };
 
-  const freshnessEntry = { name: "MYOB live GL cache", status: "Current", tone: "good" };
+  // Real per-month series backing the overview KPI sparklines. KPIs with no
+  // monthly dimension (board constants, data health) carry no series — the
+  // frontend renders those cards without a sparkline rather than a fake one.
+  const netSpark = trendMonths
+    .filter((entry) => entry.income !== null)
+    .map((entry) => entry.income - entry.expense);
+  const oversSpark = [];
+  for (let month = 1; asOfMonth !== null && month <= asOfMonth; month++) {
+    let oversCount = 0;
+    for (const fn of FUNCTIONS_RAW) {
+      const byMonth = deptMonthlySpent.get(FUNCTION_DEPT_KEYS[fn.name]);
+      if (!byMonth) continue;
+      let cumulative = 0;
+      for (let i = 0; i < month; i++) cumulative += byMonth[i];
+      if (cumulative > fn.budget) oversCount += 1;
+    }
+    oversSpark.push(oversCount);
+  }
+
+  // Data-health KPI: "Live"/good only while the sync is clean; any warning
+  // flips it to "Watch" with the first warning as the note (truncated to card
+  // width — the full strings ride on meta.warnings).
+  const healthKpi =
+    warnings.length === 0
+      ? { eyebrow: "Data health", value: "Live", note: "MYOB GL cache · " + String(generated_at ?? "").slice(0, 10), tone: "good" }
+      : {
+          eyebrow: "Data health",
+          value: "Watch",
+          note: warnings[0].length > 60 ? warnings[0].slice(0, 57) + "..." : warnings[0],
+          tone: "warn",
+        };
+
+  const overviewKpis = [
+    { ...opKpis[2], spark: netSpark },
+    OVERVIEW_KPIS[1], // Approved surplus · FY26 — board constants either way
+    {
+      eyebrow: "Functions over budget",
+      value: String(overs.length),
+      note: overs.map((fn) => fn.name).join(" · ") || "None",
+      tone: overs.length > 0 ? "warn" : "good",
+      spark: oversSpark,
+    },
+    healthKpi,
+  ];
+
+  const composition = [
+    { label: "Income", approved: APPROVED_TOTALS.income, spent: income, tone: "good" },
+    { label: "Expense", approved: APPROVED_TOTALS.expense, spent: expense, tone: "neutral" },
+  ];
+
+  // Freshness mirrors the health KPI: staleness is the specific "Stale"/bad
+  // state, any other warning downgrades to "Check"/warn.
+  const freshnessEntry = {
+    name: "MYOB live GL cache",
+    status: stale ? "Stale" : warnings.length > 0 ? "Check" : "Current",
+    tone: stale ? "bad" : warnings.length > 0 ? "warn" : "good",
+  };
   const freshnessFullEntry = { ...freshnessEntry, note: "Extracted " + String(generated_at ?? "").slice(0, 10) };
 
+  // Live alerts replace the design ALERTS constants on the overview: one bad
+  // card per over-budget function, one warn per tight function, one warn per
+  // data warning, and a single all-clear card when there is nothing to raise.
+  const alerts = [
+    ...overs.map((fn) => ({
+      title: fn.name + " over budget",
+      body:
+        "Full-year allocation exceeded by " + fmtCompact(Math.abs(fn.remaining)) + " at " + fn.used_pct + "% used.",
+      tone: "bad",
+    })),
+    ...tights.map((fn) => ({
+      title: fn.name + " " + fn.used_pct + "% committed",
+      body: fmtCompact(fn.remaining) + " of " + fmtCompact(fn.budget) + " remaining — little headroom left.",
+      tone: "warn",
+    })),
+    // Numbered titles keep alert keys unique when several warnings surface.
+    ...warnings.map((warning, index) => ({
+      title: warnings.length > 1 ? "Data warning " + (index + 1) : "Data warning",
+      body: warning,
+      tone: "warn",
+    })),
+  ];
+  if (alerts.length === 0) {
+    alerts.push({
+      title: "No alerts",
+      body: "All functions at or under elapsed-year pace and the MYOB sync is healthy.",
+      tone: "good",
+    });
+  }
+
   return {
-    meta,
+    meta: { ...meta, warnings },
     generated_at,
+    sourceCounts,
     totals,
     functions,
     departments,
@@ -308,9 +430,12 @@ function buildLiveModel(doc, meta) {
     composition,
     observation: observationFrom(overs, tights),
     trend,
+    alerts,
     freshnessEntry,
     freshnessFullEntry,
   };
 }
 
-module.exports = { buildLiveModel, fmtCompact };
+// classifyAccounts/lineKind are exported so the historical derivations
+// (myobHistoryService) classify stored lines with the exact same rules.
+module.exports = { buildLiveModel, fmtCompact, classifyAccounts, lineKind };

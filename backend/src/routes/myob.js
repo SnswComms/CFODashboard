@@ -4,6 +4,7 @@ const asyncHandler = require("../middleware/asyncHandler");
 const controller = require("../controllers/myobController");
 const historyController = require("../controllers/myobHistoryController");
 const syncController = require("../controllers/myobSyncController");
+const metricPullController = require("../controllers/metricPullController");
 
 const router = Router();
 
@@ -12,6 +13,15 @@ router.get("/sources", asyncHandler(controller.getSources));
 // Read-only sync runs (GET-only against MYOB; refreshes the local caches).
 router.post("/sync", asyncHandler(syncController.startSync));
 router.get("/sync/status", asyncHandler(syncController.getStatus));
+
+// Per-metric live pull (GET-only against MYOB; scoped to ONE figure, its own
+// cache, no global sync lock). The literal /metrics catalog is registered
+// before the :id param route. The pull is a POST — it triggers a MYOB read and
+// a local cache write (a state change), so it must not be a cacheable/prefetchable
+// GET; the catalog and last-value reads stay GET (side-effect free).
+router.get("/metrics", asyncHandler(metricPullController.listMetrics));
+router.post("/metrics/:id/pull", asyncHandler(metricPullController.pullMetric));
+router.get("/metrics/:id", asyncHandler(metricPullController.getMetric));
 
 // Historical Mongo store (parallel layer): chart-of-accounts drift for one
 // backfilled FY, and the human mapping approval that gates its visibility.

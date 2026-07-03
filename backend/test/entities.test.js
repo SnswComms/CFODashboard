@@ -3,6 +3,9 @@
 process.env.CFO_DATA_DIR = "";
 process.env.DASHBOARDS_DIR = "";
 process.env.MYOB_CACHE_DIR = "";
+// No history store in this suite: /api/history-comparison must serve the
+// fixture rows verbatim (coverage overlay only engages when Mongo is up).
+process.env.MONGODB_URI = "";
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
@@ -64,6 +67,24 @@ test("GET /api/entities/:entityId returns cards with EvidenceObject payloads", a
     assert.equal(typeof pastoral.value, "number");
     assert.ok(pastoral.evidence.people.length > 0);
     assert.equal(typeof pastoral.evidence.people[0].cost, "number");
+  });
+});
+
+test("GET /api/entities/snc function-pressure table carries per-row evidence", async () => {
+  await withServer(async (base) => {
+    const { status, body } = await requestJson(base, "/api/entities/snc");
+    assert.equal(status, 200);
+    const table = body.data.tables.find((entry) => entry.title === "Function pressure");
+    assert.ok(table, "Function pressure table missing");
+    assert.ok(Array.isArray(table.row_evidence));
+    assert.equal(table.row_evidence.length, table.rows.length);
+    for (const evidence of table.row_evidence) {
+      for (const key of ["title", "value", "summary", "period", "basis", "breakdown", "people", "links", "sources", "caveats"]) {
+        assert.ok(key in evidence, `row evidence ${evidence.title} missing ${key}`);
+      }
+    }
+    // Row order and evidence order stay parallel (both come from SNC_FUNCTION_NAMES).
+    assert.ok(table.row_evidence[0].title.toLowerCase().startsWith(String(table.rows[0][0]).toLowerCase()));
   });
 });
 
@@ -211,6 +232,67 @@ test("GET /api/history-comparison returns status rows", async () => {
       }
     }
   });
+});
+
+test("GET /api/history-comparison serves fixture rows verbatim when the history store is down", async () => {
+  await withServer(async (base) => {
+    const { status, body } = await requestJson(base, "/api/history-comparison");
+    assert.equal(status, 200);
+    // MONGODB_URI is pinned empty -> historyCoverage() is null -> no overlay.
+    const fixture = require("../fixtures/history-comparison.json");
+    assert.deepEqual(body.data.rows, fixture.rows);
+  });
+});
+
+test("overlayHistoryCoverage rewrites only the MYOB-era and department rows", () => {
+  const entitiesService = require("../src/services/entitiesService");
+  const fixture = require("../fixtures/history-comparison.json");
+  const doc = {
+    data: { generated_at: fixture.generated_at, rows: fixture.rows, total: fixture.rows.length, limit: 100, offset: 0 },
+    meta: { dataSource: "synthetic" },
+  };
+  const coverage = {
+    floorDate: "2018-07-01",
+    visibleFys: ["FY2024", "FY2025"],
+    budgetFys: [{ fy: "FY2025", sources: ["velixo"] }],
+  };
+  const result = entitiesService.overlayHistoryCoverage(doc, coverage);
+
+  const myob = result.data.rows.find((row) => row.area === "MYOB current-era account detail");
+  assert.equal(myob.status, "Available");
+  assert.ok(myob.what.includes("2018-07-01"));
+  assert.ok(myob.what.includes("FY2024, FY2025"));
+
+  const dept = result.data.rows.find((row) => row.area === "Department budget vs actual by function");
+  assert.equal(dept.status, "Available");
+  assert.ok(dept.what.includes("FY2024, FY2025"));
+  assert.ok(dept.what.includes("budget rows loaded for FY2025"));
+
+  // All other rows pass through untouched, and the input doc is not mutated.
+  for (const row of result.data.rows) {
+    if (row === myob || row === dept) continue;
+    assert.deepEqual(row, fixture.rows.find((entry) => entry.area === row.area));
+  }
+  assert.deepEqual(doc.data.rows, fixture.rows);
+  assert.equal(result.meta, doc.meta);
+});
+
+test("overlayHistoryCoverage states the coverage limit when no prior FYs are visible", () => {
+  const entitiesService = require("../src/services/entitiesService");
+  const fixture = require("../fixtures/history-comparison.json");
+  const doc = {
+    data: { generated_at: fixture.generated_at, rows: fixture.rows, total: fixture.rows.length, limit: 100, offset: 0 },
+    meta: { dataSource: "synthetic" },
+  };
+  const result = entitiesService.overlayHistoryCoverage(doc, { floorDate: null, visibleFys: [], budgetFys: [] });
+
+  const myob = result.data.rows.find((row) => row.area === "MYOB current-era account detail");
+  assert.equal(myob.status, "Current year only");
+  assert.ok(myob.what.includes("no prior FYs pass the mapping gate"));
+
+  const dept = result.data.rows.find((row) => row.area === "Department budget vs actual by function");
+  assert.equal(dept.status, "Current year only");
+  assert.ok(dept.what.includes("no prior FYs pass the mapping gate"));
 });
 
 test("GET /api/evidence-registry supports confidence filtering", async () => {

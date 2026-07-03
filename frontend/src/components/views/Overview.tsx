@@ -6,9 +6,11 @@
 // (budget-vs-spend bars) per the frontend/backend contract. Renders
 // pixel-identical from the designData fallback when the backend is unreachable.
 
-import type { CSSProperties } from 'react';
-import { useApiGet } from '@/lib/api';
+import { useCallback, useState, type CSSProperties } from 'react';
+import { useApiGet, useApiGetEnvelope } from '@/lib/api';
 import { color, tint, FONT } from '@/lib/format';
+import MetricRefreshControl from '@/components/MetricRefreshControl';
+import type { MetricRefreshDoc } from '@/lib/useMetricRefresh';
 import { OPERATING_FALLBACK } from '@/lib/commandCentre';
 import type { KpiTone, OperatingPayload } from '@/lib/commandCentre';
 import {
@@ -23,10 +25,16 @@ import {
 
 interface OverviewPayload {
   generated_at: string | null;
-  kpis: Array<{ eyebrow: string; value: string; note: string; tone: KpiTone }>;
+  kpis: Array<{ eyebrow: string; value: string; note: string; tone: KpiTone; spark?: number[] }>;
   dash_cards: Array<{ id: string; title: string; desc: string; status: string; tone: KpiTone }>;
   alerts: Array<{ title: string; body: string; tone: KpiTone }>;
   freshness: Array<{ name: string; status: string; tone: KpiTone }>;
+  // Additive live-only fields (absent in synthetic mode / the fallback).
+  approved_totals?: { income: number; expense: number; net: number };
+  trend?: {
+    as_of_month: number | null;
+    months: Array<{ month: number; income: number | null; expense: number | null }>;
+  };
 }
 
 const toneFromColor = (c: string): KpiTone =>
@@ -43,13 +51,16 @@ const FALLBACK: OverviewPayload = {
 };
 
 // ---------------------------------------------------------------------------
-// Operating trend chart (GA-style analytics) — ported verbatim from app-script.js
+// Operating trend chart (GA-style analytics). Geometry math ported verbatim
+// from app-script.js, parameterised so the same builder renders either the
+// live cumulative actuals (with a projection to the approved totals) or the
+// design fallback curve.
 // ---------------------------------------------------------------------------
 
 const gaMonths = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
+const MONTH_NAMES = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 const annI = 8032932;
 const annE = 7896544;
-const maxY = 9000000;
 const GW = 680;
 const GH = 240;
 const gpL = 54;
@@ -57,7 +68,55 @@ const gpR = 14;
 const gpT = 16;
 const gpB = 26;
 const gx = (m: number) => gpL + (m / 11) * (GW - gpL - gpR);
-const gy = (v: number) => GH - gpB - (v / maxY) * (GH - gpT - gpB);
+
+const axisLabel = (v: number) =>
+  v === 0 ? '$0' : v >= 1e6 ? '$' + String(Math.round((v / 1e6) * 10) / 10) + 'M' : '$' + Math.round(v / 1e3) + 'K';
+
+interface TrendGeometry {
+  expAreaSolid: string;
+  expAreaProj: string;
+  expLineSolid: string;
+  expLineProj: string;
+  incLineSolid: string;
+  incLineProj: string;
+  gridY: Array<{ y: string; label: string }>;
+  xticks: Array<{ x: string; label: string }>;
+  markerX: string;
+  markerLabel: string;
+}
+
+function buildTrendGeometry(inc: number[], exp: number[], aIdx: number, maxY: number, markerLabel: string): TrendGeometry {
+  const gy = (v: number) => GH - gpB - (v / maxY) * (GH - gpT - gpB);
+  const gyb = gy(0).toFixed(1);
+  const gpts = (arr: number[], a: number, b: number) => {
+    const r: string[] = [];
+    for (let m = a; m <= b; m++) r.push(gx(m).toFixed(1) + ',' + gy(arr[m]).toFixed(1));
+    return r.join(' ');
+  };
+  const garea = (arr: number[], a: number, b: number) => {
+    let d = 'M ' + gx(a).toFixed(1) + ',' + gyb;
+    for (let m = a; m <= b; m++) d += ' L ' + gx(m).toFixed(1) + ',' + gy(arr[m]).toFixed(1);
+    d += ' L ' + gx(b).toFixed(1) + ',' + gyb + ' Z';
+    return d;
+  };
+  return {
+    expAreaSolid: garea(exp, 0, aIdx),
+    expAreaProj: garea(exp, aIdx, 11),
+    expLineSolid: gpts(exp, 0, aIdx),
+    expLineProj: gpts(exp, aIdx, 11),
+    incLineSolid: gpts(inc, 0, aIdx),
+    incLineProj: gpts(inc, aIdx, 11),
+    gridY: [0, 1, 2, 3].map((step) => {
+      const v = (maxY / 3) * step;
+      return { y: gy(v).toFixed(1), label: axisLabel(v) };
+    }),
+    xticks: gaMonths.map((mm, i) => ({ x: gx(i).toFixed(1), label: mm })),
+    markerX: gx(aIdx).toFixed(1),
+    markerLabel,
+  };
+}
+
+// Design fallback curve (verbatim synthetic math from app-script.js).
 const incA: number[] = [];
 const expA: number[] = [];
 for (let m = 0; m < 12; m++) {
@@ -65,33 +124,38 @@ for (let m = 0; m < 12; m++) {
   incA.push(Math.round(annI * f * (0.98 + 0.02 * f)));
   expA.push(Math.round(annE * f * (1.04 - 0.04 * f)));
 }
-const aIdx = 4;
-const gyb = gy(0).toFixed(1);
-const gpts = (arr: number[], a: number, b: number) => {
-  const r: string[] = [];
-  for (let m = a; m <= b; m++) r.push(gx(m).toFixed(1) + ',' + gy(arr[m]).toFixed(1));
-  return r.join(' ');
-};
-const garea = (arr: number[], a: number, b: number) => {
-  let d = 'M ' + gx(a).toFixed(1) + ',' + gyb;
-  for (let m = a; m <= b; m++) d += ' L ' + gx(m).toFixed(1) + ',' + gy(arr[m]).toFixed(1);
-  d += ' L ' + gx(b).toFixed(1) + ',' + gyb + ' Z';
-  return d;
-};
-const trend = {
-  expAreaSolid: garea(expA, 0, aIdx),
-  expAreaProj: garea(expA, aIdx, 11),
-  expLineSolid: gpts(expA, 0, aIdx),
-  expLineProj: gpts(expA, aIdx, 11),
-  incLineSolid: gpts(incA, 0, aIdx),
-  incLineProj: gpts(incA, aIdx, 11),
-  gridY: [0, 3000000, 6000000, 9000000].map((v) => ({
-    y: gy(v).toFixed(1),
-    label: v === 0 ? '$0' : '$' + v / 1e6 + 'M',
-  })),
-  xticks: gaMonths.map((mm, i) => ({ x: gx(i).toFixed(1), label: mm })),
-  markerX: gx(aIdx).toFixed(1),
-};
+const DESIGN_TREND = buildTrendGeometry(incA, expA, 4, 9000000, 'AS OF MAY');
+
+// Live geometry: cumulative actuals solid through as_of_month, then a straight
+// dashed projection landing on the board-approved full-year totals in December.
+function liveTrendGeometry(
+  trend: OverviewPayload['trend'],
+  approved: OverviewPayload['approved_totals']
+): TrendGeometry | null {
+  if (!trend || trend.as_of_month === null || !trend.months?.length) return null;
+  const aIdx = Math.min(11, Math.max(0, trend.as_of_month - 1));
+  const annualInc = approved?.income ?? annI;
+  const annualExp = approved?.expense ?? annE;
+  const inc: number[] = [];
+  const exp: number[] = [];
+  let lastInc = 0;
+  let lastExp = 0;
+  for (let m = 0; m <= aIdx; m++) {
+    lastInc = trend.months[m]?.income ?? lastInc;
+    lastExp = trend.months[m]?.expense ?? lastExp;
+    inc.push(lastInc);
+    exp.push(lastExp);
+  }
+  for (let m = aIdx + 1; m < 12; m++) {
+    const t = (m - aIdx) / (11 - aIdx);
+    inc.push(Math.round(lastInc + (annualInc - lastInc) * t));
+    exp.push(Math.round(lastExp + (annualExp - lastExp) * t));
+  }
+  const peak = Math.max(...inc, ...exp, annualInc, annualExp, 1);
+  // Nice ceiling: thirds of the axis land on clean $0.5M steps (design: 9M/3M).
+  const maxY = Math.ceil(peak / 1.5e6) * 1.5e6;
+  return buildTrendGeometry(inc, exp, aIdx, maxY, 'AS OF ' + MONTH_NAMES[aIdx]);
+}
 
 // ---------------------------------------------------------------------------
 // Metric cards + sparklines — ported verbatim from app-script.js
@@ -138,8 +202,33 @@ const SECTION_TITLE: CSSProperties = {
 // Component
 // ---------------------------------------------------------------------------
 
+// Per-metric live-pull binding for the three operating KPI cards. The id MUST
+// match the backend registry (backend/src/constants/metricRegistry.js); the
+// endpoint is the scoped pull route (POST — read-only against MYOB). cardIndex ties each metric to its
+// position in the metric-cards row (income / spend / net), so a fresh pull can
+// swap that one card in place. The "Functions on watch" card (index 3) is a
+// derived roll-up with no single MYOB slice, so it has no per-metric control.
+const OVERVIEW_KPI_METRICS = [
+  { cardIndex: 0, id: 'overview-operating-income', endpoint: '/myob/metrics/overview-operating-income/pull' },
+  { cardIndex: 1, id: 'overview-operating-spend', endpoint: '/myob/metrics/overview-operating-spend/pull' },
+  { cardIndex: 2, id: 'overview-operating-net', endpoint: '/myob/metrics/overview-operating-net/pull' },
+];
+
+// The fresh KPI figure a per-metric pull hands back. The overview_kpi recipe's
+// `value` is exactly a KPI card shape (backend metricPullService.computeOverviewKpi).
+interface FreshKpi {
+  eyebrow: string;
+  value: string;
+  note: string;
+  tone: KpiTone;
+}
+
 export default function Overview() {
-  const data = useApiGet<OverviewPayload>('/command-centre/overview', FALLBACK);
+  // Envelope-preserving fetch: meta.warnings carries live data-health issues
+  // (sync errors, stale cache) surfaced in the "Data warnings" card below.
+  const overviewEnv = useApiGetEnvelope<OverviewPayload>('/command-centre/overview');
+  const data = overviewEnv?.data ?? FALLBACK;
+  const warnings = overviewEnv?.meta.warnings ?? [];
   const operating = useApiGet<OperatingPayload>('/command-centre/functions', OPERATING_FALLBACK);
 
   // Shell owns view state and listens for 'cc:navigate' window events; the
@@ -148,19 +237,52 @@ export default function Overview() {
     window.dispatchEvent(new CustomEvent('cc:navigate', { detail: id }));
   };
 
+  // Fresh per-metric pulls keyed by card index: a per-metric refresh writes the
+  // recomputed KPI here so ONLY that card swaps, without refetching the whole
+  // overview payload or touching the shared caches.
+  const [freshByIndex, setFreshByIndex] = useState<Record<number, FreshKpi>>({});
+
+  // One stable callback that records the fresh KPI under its card index. Stable
+  // identity (the setter closes over nothing mutable) keeps MetricRefreshControl's
+  // onRefreshed effect from re-firing.
+  const applyFresh = useCallback((cardIndex: number, doc: MetricRefreshDoc) => {
+    const kpi = doc.value as unknown as FreshKpi;
+    if (!kpi || typeof kpi.value !== 'string') return;
+    setFreshByIndex((prev) => ({ ...prev, [cardIndex]: kpi }));
+  }, []);
+
   // Metric cards: fetched kpis when present, hardcoded design cards otherwise.
-  // Sparklines are decorative (no backing series in the payload) and keep the
-  // design paths either way.
-  const cards = data.kpis?.length
-    ? data.kpis.map((k, i) => ({
+  // Live sparklines come from the payload's real per-month series; KPIs
+  // without one (board constants, data health) render without a sparkline.
+  const baseCards = data.kpis?.length
+    ? data.kpis.map((k) => ({
         label: k.eyebrow,
         value: k.value,
         delta: k.note,
         deltaColor: k.tone === 'neutral' ? '#757C86' : color(k.tone),
         color: k.tone === 'neutral' ? '#41566C' : color(k.tone),
-        spark: metricCards[i % metricCards.length].spark,
+        spark: k.spark && k.spark.length >= 2 ? spark(k.spark) : null,
       }))
     : metricCards;
+
+  // Overlay any fresh per-metric pull on its card (value + delta + tone colour),
+  // leaving the sparkline (a historical series the scoped pull doesn't recompute)
+  // untouched.
+  const cards = baseCards.map((c, i) => {
+    const fresh = freshByIndex[i];
+    if (!fresh) return c;
+    return {
+      ...c,
+      value: fresh.value,
+      delta: fresh.note,
+      deltaColor: fresh.tone === 'neutral' ? '#757C86' : color(fresh.tone),
+      color: fresh.tone === 'neutral' ? '#41566C' : color(fresh.tone),
+    };
+  });
+
+  // Trend chart: live cumulative actuals when the payload carries them,
+  // otherwise the design fallback curve.
+  const trendGeo = liveTrendGeometry(data.trend, data.approved_totals) ?? DESIGN_TREND;
 
   // Budget vs spend bars from GET /command-centre/functions (design math kept:
   // track/fill scaled to the largest budget, | marker at elapsed-year pace).
@@ -203,8 +325,10 @@ export default function Overview() {
       </p>
 
       {/* Metric cards with sparklines */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 22 }}>
-        {cards.map((c) => (
+      <div className="cc-grid-4" style={{ gap: 12, marginBottom: 22 }}>
+        {cards.map((c, i) => {
+          const metric = OVERVIEW_KPI_METRICS.find((m) => m.cardIndex === i);
+          return (
           <div
             key={c.label}
             style={{ background: '#FFFFFF', border: '1px solid #E7E5DF', borderRadius: 12, padding: '17px 17px 13px' }}
@@ -256,26 +380,38 @@ export default function Overview() {
                   {c.delta}
                 </div>
               </div>
-              <svg
-                viewBox="0 0 104 30"
-                width={104}
-                height={30}
-                preserveAspectRatio="none"
-                style={{ display: 'block', flex: 'none' }}
-              >
-                <path d={c.spark.area} fill={c.color} fillOpacity={0.1} />
-                <polyline
-                  points={c.spark.line}
-                  fill="none"
-                  stroke={c.color}
-                  strokeWidth={1.6}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+              {c.spark && (
+                <svg
+                  viewBox="0 0 104 30"
+                  width={104}
+                  height={30}
+                  preserveAspectRatio="none"
+                  style={{ display: 'block', flex: 'none' }}
+                >
+                  <path d={c.spark.area} fill={c.color} fillOpacity={0.1} />
+                  <polyline
+                    points={c.spark.line}
+                    fill="none"
+                    stroke={c.color}
+                    strokeWidth={1.6}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              )}
             </div>
+            {metric && (
+              <div style={{ marginTop: 12, paddingTop: 11, borderTop: '1px solid #EFEDE7' }}>
+                <MetricRefreshControl
+                  id={metric.id}
+                  endpoint={metric.endpoint}
+                  onRefreshed={(doc) => applyFresh(i, doc)}
+                />
+              </div>
+            )}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Operating trend */}
@@ -310,7 +446,7 @@ export default function Overview() {
                 <stop offset="1" stopColor="#1B2430" stopOpacity="0" />
               </linearGradient>
             </defs>
-            {trend.gridY.map((g) => (
+            {trendGeo.gridY.map((g) => (
               <g key={g.y}>
                 <line x1={54} y1={g.y} x2={666} y2={g.y} stroke="#EFEDE7" strokeWidth={1} />
                 <text
@@ -326,19 +462,19 @@ export default function Overview() {
                 </text>
               </g>
             ))}
-            <path d={trend.expAreaSolid} fill="url(#cc-expg)" />
-            <path d={trend.expAreaProj} fill="#1B2430" fillOpacity={0.045} />
+            <path d={trendGeo.expAreaSolid} fill="url(#cc-expg)" />
+            <path d={trendGeo.expAreaProj} fill="#1B2430" fillOpacity={0.045} />
             <line
-              x1={trend.markerX}
+              x1={trendGeo.markerX}
               y1={16}
-              x2={trend.markerX}
+              x2={trendGeo.markerX}
               y2={214}
               stroke="#C9A24B"
               strokeWidth={1}
               strokeDasharray="3 3"
             />
             <text
-              x={trend.markerX}
+              x={trendGeo.markerX}
               y={12}
               textAnchor="middle"
               fontSize={8.5}
@@ -346,10 +482,10 @@ export default function Overview() {
               letterSpacing="0.5"
               style={{ fontFamily: FONT }}
             >
-              AS OF MAY
+              {trendGeo.markerLabel}
             </text>
             <polyline
-              points={trend.expLineProj}
+              points={trendGeo.expLineProj}
               fill="none"
               stroke="#1B2430"
               strokeWidth={2}
@@ -359,7 +495,7 @@ export default function Overview() {
               strokeLinejoin="round"
             />
             <polyline
-              points={trend.expLineSolid}
+              points={trendGeo.expLineSolid}
               fill="none"
               stroke="#1B2430"
               strokeWidth={2}
@@ -367,7 +503,7 @@ export default function Overview() {
               strokeLinejoin="round"
             />
             <polyline
-              points={trend.incLineProj}
+              points={trendGeo.incLineProj}
               fill="none"
               stroke="#3E7A55"
               strokeWidth={2}
@@ -377,14 +513,14 @@ export default function Overview() {
               strokeLinejoin="round"
             />
             <polyline
-              points={trend.incLineSolid}
+              points={trendGeo.incLineSolid}
               fill="none"
               stroke="#3E7A55"
               strokeWidth={2}
               strokeLinecap="round"
               strokeLinejoin="round"
             />
-            {trend.xticks.map((t, i) => (
+            {trendGeo.xticks.map((t, i) => (
               <text
                 key={i}
                 x={t.x}
@@ -402,14 +538,29 @@ export default function Overview() {
       </div>
 
       {/* Budget vs spend + attention / freshness */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.55fr 1fr', gap: 26, alignItems: 'start' }}>
+      <div className="cc-grid-2-wide" style={{ gap: 26, alignItems: 'start' }}>
         <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 18 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
             <div style={SECTION_TITLE}>Budget vs spend by function</div>
             <div style={{ fontFamily: FONT, fontSize: 9.5, color: '#B7BAC0', letterSpacing: '.04em' }}>
               | = elapsed-year pace
             </div>
           </div>
+          {operating.observation ? (
+            <p
+              style={{
+                fontFamily: FONT,
+                fontWeight: 300,
+                fontSize: 14.5,
+                lineHeight: 1.5,
+                color: '#39424F',
+                margin: '0 0 16px',
+                maxWidth: 640,
+              }}
+            >
+              {operating.observation}
+            </p>
+          ) : null}
           <div style={{ background: '#FFFFFF', border: '1px solid #E7E5DF', borderRadius: 12, padding: '22px 24px' }}>
             {functionBars.map((f) => (
               <div key={f.name} style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 15 }}>
@@ -487,6 +638,25 @@ export default function Overview() {
         </div>
 
         <div>
+          {warnings.length > 0 && (
+            <div
+              style={{
+                background: '#FFFFFF',
+                border: '1px solid #E7E5DF',
+                borderLeft: '3px solid #8A6A2A',
+                borderRadius: 8,
+                padding: '13px 15px',
+                marginBottom: 16,
+              }}
+            >
+              <div style={{ fontSize: 13, fontWeight: 500, color: '#1B2430', marginBottom: 4 }}>Data warnings</div>
+              {warnings.map((w) => (
+                <div key={w} style={{ fontSize: 12, lineHeight: 1.45, color: '#757C86' }}>
+                  {w}
+                </div>
+              ))}
+            </div>
+          )}
           <div style={{ ...SECTION_TITLE, marginBottom: 16 }}>Needs attention</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 28 }}>
             {alerts.map((a) => (

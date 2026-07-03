@@ -16,6 +16,8 @@ venv/
 *.key
 *.p12
 *.pfx
+# Mongo mutual-TLS client cert + CA (fetched from the VPS /etc/mongodb/ssl)
+backend/certs/
 
 # Generated dashboard outputs and private data
 briefings/

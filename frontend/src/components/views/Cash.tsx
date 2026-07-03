@@ -3,11 +3,15 @@
 // Cash position view — faithful port of the design's CASH section
 // (template.html lines 599-616): source-backed cash discipline messaging with
 // pending MYOB/CMF states. Wired per CONTRACT.md to the EXISTING endpoints
-// GET /api/cash/position and GET /api/cash/status; falls back to the design's
-// exact static content when the backend is unreachable.
+// GET /api/cash/position, GET /api/cash/status and GET /api/cash/candidates;
+// falls back to the design's exact static content when the backend is
+// unreachable.
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { apiGet, type ApiMeta } from '@/lib/api';
+import { fmtF } from '@/lib/format';
+import MetricRefreshControl from '@/components/MetricRefreshControl';
+import type { MetricRefreshDoc } from '@/lib/useMetricRefresh';
 
 const FONT = "var(--font-poppins), 'Poppins', sans-serif";
 
@@ -43,6 +47,54 @@ interface CashStatus {
   dataSource: string;
 }
 
+// GET /api/cash/candidates — coalesced cash-account rows from the latest MYOB
+// endpoint probe (cashService.js#coalesceCandidate); balance may arrive as a
+// number or a raw string depending on which MYOB field was populated.
+interface CashCandidate {
+  _endpoint: string | null;
+  account: string | null;
+  description: string | null;
+  balance: number | string | null;
+  raw: unknown;
+}
+
+interface CandidatesPayload {
+  generated_at: string | null;
+  count: number;
+  total: number;
+  limit: number;
+  offset: number;
+  candidates: CashCandidate[];
+}
+
+// ---------- per-metric live-pull value shapes (backend metricPullService) ----------
+
+// id "cash-cmf-movement" → doc.value: net CMF movement keyed by account, plus
+// the number of ledger lines the scoped pull read. Mirrors Overview's FreshKpi:
+// a small local interface so the overlay reads doc.value with clean types.
+interface FreshCmfMovement {
+  balances_by_account: Record<string, number>;
+  line_count: number;
+}
+
+// id "cash-gl-movements" → doc.value: per-GL-account net movements for the
+// 111xxx cash accounts, with the basis and any data-health warning.
+interface FreshGlAccount {
+  account: string;
+  description: string;
+  net_movement: number;
+  debit: number;
+  credit: number;
+  line_count: number;
+  myob_source: string;
+}
+
+interface FreshGlMovements {
+  accounts: FreshGlAccount[];
+  basis: string;
+  warning: string;
+}
+
 // ---------- fallbacks: the design's explicit "no live figures" state ----------
 
 const FALLBACK_POSITION: CashPosition = {
@@ -64,6 +116,18 @@ const FALLBACK_STATUS: CashStatus = {
 // Design's static GL candidate chips, used until the backend supplies
 // recommended_myob_accounts.
 const FALLBACK_CHIPS = ['111200 · Bank (AUD)', '111300 · CMF (AUD)'];
+
+// Candidates table fallback: the empty state renders the explicit
+// "no candidates" line (Python parity: generate_cash_position_dashboard.py
+// keeps its candidates table open with a no-probe row).
+const FALLBACK_CANDIDATES: CandidatesPayload = {
+  generated_at: null,
+  count: 0,
+  total: 0,
+  limit: 0,
+  offset: 0,
+  candidates: [],
+};
 
 // Shared-code gap workaround: lib/api.ts#apiGet unwraps the envelope and
 // discards `meta`, but this view must render meta.source_rule (contract's
@@ -135,10 +199,63 @@ const chipStyle: React.CSSProperties = {
   padding: '3px 9px',
 };
 
+const thStyle: React.CSSProperties = {
+  ...microLabel,
+  textAlign: 'left',
+  padding: '0 12px 8px 0',
+};
+
+const tdStyle: React.CSSProperties = {
+  fontFamily: FONT,
+  fontSize: 12.5,
+  color: '#39424F',
+  padding: '7px 12px 7px 0',
+  borderTop: '1px solid #EFEDE7',
+  verticalAlign: 'top',
+};
+
+const tdMoneyStyle: React.CSSProperties = {
+  ...tdStyle,
+  textAlign: 'right',
+  paddingRight: 0,
+  fontVariantNumeric: 'tabular-nums',
+  whiteSpace: 'nowrap',
+};
+
+// Probe balance fields are whatever MYOB returned (number or raw string);
+// only format genuine numbers as currency, never coerce blanks to $0.
+function fmtCandidateBalance(value: number | string | null): string {
+  if (value === null || value === '') return '—';
+  const n = Number(value);
+  return Number.isFinite(n) ? fmtF(n) : String(value);
+}
+
 export default function Cash() {
   const [position, setPosition] = useState<CashPosition>(FALLBACK_POSITION);
   const [status, setStatus] = useState<CashStatus>(FALLBACK_STATUS);
   const [sourceRule, setSourceRule] = useState<string | null>(null);
+  const [warnings, setWarnings] = useState<string[]>([]);
+  const [candidates, setCandidates] = useState<CandidatesPayload>(FALLBACK_CANDIDATES);
+
+  // Fresh per-metric pulls. Each holds the recomputed figure from a scoped MYOB
+  // pull so ONLY that card swaps in place, without refetching /api/cash/* or
+  // touching the shared caches (mirrors Overview's freshByIndex/applyFresh).
+  const [freshCmf, setFreshCmf] = useState<FreshCmfMovement | null>(null);
+  const [freshGl, setFreshGl] = useState<FreshGlMovements | null>(null);
+
+  // Stable callbacks (close over nothing mutable) so MetricRefreshControl's
+  // onRefreshed effect fires once per pull, never in a render loop.
+  const applyCmfFresh = useCallback((doc: MetricRefreshDoc) => {
+    const value = doc.value as unknown as FreshCmfMovement;
+    if (!value || typeof value !== 'object' || !value.balances_by_account) return;
+    setFreshCmf(value);
+  }, []);
+
+  const applyGlFresh = useCallback((doc: MetricRefreshDoc) => {
+    const value = doc.value as unknown as FreshGlMovements;
+    if (!value || !Array.isArray(value.accounts)) return;
+    setFreshGl(value);
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -154,9 +271,18 @@ export default function Cash() {
           : [],
       });
       setSourceRule(extractSourceRule(env.meta));
+      setWarnings(Array.isArray(env.meta.warnings) ? env.meta.warnings : []);
     });
     apiGet<CashStatus>('/api/cash/status', FALLBACK_STATUS).then((s) => {
       if (alive) setStatus({ ...FALLBACK_STATUS, ...s });
+    });
+    apiGet<CandidatesPayload>('/api/cash/candidates', FALLBACK_CANDIDATES).then((c) => {
+      if (!alive) return;
+      setCandidates({
+        ...FALLBACK_CANDIDATES,
+        ...c,
+        candidates: Array.isArray(c.candidates) ? c.candidates : [],
+      });
     });
     return () => {
       alive = false;
@@ -177,8 +303,22 @@ export default function Cash() {
       ? `${position.targets.length} Westpac & CMF accounts are held locally as reconciliation targets only, with full identifiers masked.`
       : '20 Westpac & CMF accounts are held locally as reconciliation targets only, with full identifiers masked.';
 
+  // CMF overlay: on a fresh pull, sum the per-account CMF net movement and show
+  // it in place inside the CMF lane card. Absent a pull, the card keeps its
+  // source-status text untouched (the default apiGet payload).
+  const cmfMovementTotal = freshCmf
+    ? Object.values(freshCmf.balances_by_account).reduce((sum, n) => sum + (Number.isFinite(n) ? n : 0), 0)
+    : null;
+
+  // GL overlay: index fresh per-account net movements by AccountCD so the
+  // candidates table can swap ONLY the balance column for accounts the pull
+  // covers, leaving un-pulled rows on their probe value.
+  const glByAccount = freshGl
+    ? new Map(freshGl.accounts.map((a) => [a.account, a]))
+    : null;
+
   return (
-    <div style={{ maxWidth: 780, margin: '0 auto' }}>
+    <div>
       <div style={{ background: '#FFFFFF', border: '1px solid #E7E5DF', borderRadius: 12, padding: 32 }}>
         <h3
           style={{
@@ -207,7 +347,7 @@ export default function Cash() {
           never used to make a liquidity claim.
         </p>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 26 }}>
+        <div className="cc-grid-2" style={{ gap: 14, marginBottom: 26 }}>
           <div style={stateCard}>
             <div
               style={{
@@ -254,14 +394,41 @@ export default function Cash() {
                   letterSpacing: '.05em',
                   textTransform: 'uppercase',
                   fontWeight: 500,
-                  color: cmfRefreshed ? '#3E7A55' : '#A8443B',
+                  color: cmfRefreshed || freshCmf ? '#3E7A55' : '#A8443B',
                 }}
               >
-                {cmfRefreshed ? 'Refreshed' : 'Pending'}
+                {cmfRefreshed || freshCmf ? 'Refreshed' : 'Pending'}
               </div>
             </div>
-            <div style={{ fontSize: 14, color: '#39424F', lineHeight: 1.4 }}>
-              {position.cmf_status}
+            {cmfMovementTotal !== null ? (
+              <div>
+                <div
+                  style={{
+                    fontFamily: FONT,
+                    fontWeight: 300,
+                    fontSize: 24,
+                    lineHeight: 1,
+                    color: '#1B2430',
+                    fontVariantNumeric: 'tabular-nums',
+                  }}
+                >
+                  {fmtF(cmfMovementTotal)}
+                </div>
+                <div style={{ fontSize: 12, color: '#757C86', lineHeight: 1.4, marginTop: 6 }}>
+                  Net CMF movement · {freshCmf?.line_count ?? 0} lines
+                </div>
+              </div>
+            ) : (
+              <div style={{ fontSize: 14, color: '#39424F', lineHeight: 1.4 }}>
+                {position.cmf_status}
+              </div>
+            )}
+            <div style={{ marginTop: 12, paddingTop: 11, borderTop: '1px solid #EFEDE7' }}>
+              <MetricRefreshControl
+                id="cash-cmf-movement"
+                endpoint="/myob/metrics/cash-cmf-movement/pull"
+                onRefreshed={applyCmfFresh}
+              />
             </div>
           </div>
         </div>
@@ -273,6 +440,106 @@ export default function Cash() {
               {chip}
             </span>
           ))}
+        </div>
+
+        {position.targets.length > 0 ? (
+          <div style={{ marginTop: 26 }}>
+            <div style={{ ...microLabel, marginBottom: 10 }}>
+              Reconciliation targets — not source balances
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th style={thStyle}>System</th>
+                    <th style={thStyle}>Name</th>
+                    <th style={thStyle}>Account</th>
+                    <th style={thStyle}>MYOB match</th>
+                    <th style={{ ...thStyle, textAlign: 'right', paddingRight: 0 }}>Balance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {position.targets.map((t) => (
+                    <tr key={`${t.system}-${t.name}-${t.external_account}`}>
+                      <td style={tdStyle}>{t.system}</td>
+                      <td style={tdStyle}>{t.name}</td>
+                      {/* Already masked by the backend; no unmasked lookup exists here. */}
+                      <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{t.external_account}</td>
+                      <td style={{ ...tdStyle, ...(t.myob_source ? {} : { color: '#9AA0A8' }) }}>
+                        {t.myob_source ?? 'Awaiting MYOB endpoint match'}
+                      </td>
+                      <td style={tdMoneyStyle}>
+                        {t.myob_balance == null ? '—' : fmtF(t.myob_balance)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : null}
+
+        <div style={{ marginTop: 26 }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'flex-start',
+              gap: 12,
+              marginBottom: 10,
+            }}
+          >
+            <div style={microLabel}>
+              MYOB cash account candidates
+              {candidates.generated_at ? ` — probe ${candidates.generated_at.slice(0, 10)}` : ''}
+              {glByAccount ? ` · GL movements ${freshGl?.basis ?? ''}`.trimEnd() : ''}
+            </div>
+            <MetricRefreshControl
+              id="cash-gl-movements"
+              endpoint="/myob/metrics/cash-gl-movements/pull"
+              onRefreshed={applyGlFresh}
+            />
+          </div>
+          {freshGl?.warning ? (
+            <div style={{ fontFamily: FONT, fontSize: 12, color: '#8A6A2A', marginBottom: 10, lineHeight: 1.45 }}>
+              {freshGl.warning}
+            </div>
+          ) : null}
+          {candidates.candidates.length > 0 ? (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th style={thStyle}>Endpoint</th>
+                    <th style={thStyle}>Account</th>
+                    <th style={thStyle}>Description</th>
+                    <th style={{ ...thStyle, textAlign: 'right', paddingRight: 0 }}>Balance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {candidates.candidates.map((c, i) => {
+                    // Overlay ONLY this row's balance when the fresh GL pull
+                    // covers its account; other rows keep their probe value.
+                    const gl = c.account ? glByAccount?.get(c.account) : undefined;
+                    return (
+                    <tr key={`${c._endpoint ?? ''}-${c.account ?? ''}-${i}`}>
+                      <td style={tdStyle}>{c._endpoint ?? '—'}</td>
+                      <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{c.account ?? '—'}</td>
+                      <td style={tdStyle}>{c.description ?? '—'}</td>
+                      <td style={tdMoneyStyle}>
+                        {gl ? fmtF(gl.net_movement) : fmtCandidateBalance(c.balance)}
+                      </td>
+                    </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div style={{ fontFamily: FONT, fontSize: 12.5, color: '#9AA0A8' }}>
+              No cash-account candidates in the latest probe.
+            </div>
+          )}
         </div>
 
         <div
@@ -289,6 +556,11 @@ export default function Cash() {
           {sourceRule ? (
             <div style={{ marginTop: 6 }}>{sourceRule}</div>
           ) : null}
+          {warnings.map((warning) => (
+            <div key={warning} style={{ marginTop: 6, color: '#8A6A2A' }}>
+              {warning}
+            </div>
+          ))}
         </div>
       </div>
     </div>

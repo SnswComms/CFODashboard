@@ -6,4 +6,9 @@ async function createUser(request, response) {
   response.status(201).json(envelope(user, { dataSource: "better-auth" }));
 }
 
-module.exports = { createUser };
+async function mailStatus(request, response) {
+  const status = adminUsersService.mailStatus();
+  response.status(200).json(envelope(status, { dataSource: "mailer" }));
+}
+
+module.exports = { createUser, mailStatus };

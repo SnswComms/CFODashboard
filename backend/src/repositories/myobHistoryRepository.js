@@ -140,6 +140,30 @@ async function listJournalLinesByDate(fromDate, toDate, { db } = {}) {
   return docs.map(mapDoc);
 }
 
+// Promise<Array<object>> — budget rows for one FY (source "manual"|"myob"),
+// account order, _id mapped to id.
+async function listBudgetsByFy(fy, { db } = {}) {
+  const database = resolveDb(db);
+  if (!database) return [];
+  const docs = await database.collection(GL_BUDGETS_COLLECTION).find({ fy }).sort({ account: 1 }).toArray();
+  return docs.map(mapDoc);
+}
+
+// Promise<Array<{fy, sources}>> — which FYs have budget rows loaded and from
+// which sources (oldest FY first, sources sorted) — the copilot's coverage
+// facts, cheap enough at a few hundred accounts per FY.
+async function listBudgetFys({ db } = {}) {
+  const database = resolveDb(db);
+  if (!database) return [];
+  const docs = await database.collection(GL_BUDGETS_COLLECTION).find({}).sort({ fy: 1 }).toArray();
+  const byFy = new Map();
+  for (const doc of docs) {
+    if (!byFy.has(doc.fy)) byFy.set(doc.fy, new Set());
+    byFy.get(doc.fy).add(doc.source);
+  }
+  return [...byFy.entries()].map(([fy, sources]) => ({ fy, sources: [...sources].sort() }));
+}
+
 // Promise<object|null> — one FY watermark, _id mapped to id (string)
 async function getSyncState(fy, { db } = {}) {
   const database = resolveDb(db);
@@ -166,6 +190,8 @@ module.exports = {
   upsertSyncState,
   setSyncStateFields,
   listJournalLinesByDate,
+  listBudgetsByFy,
+  listBudgetFys,
   getSyncState,
   listSyncStates,
 };

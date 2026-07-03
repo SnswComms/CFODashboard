@@ -9,9 +9,11 @@
 // loads them from a file export with source "manual" instead.
 const config = require("../config");
 const myobClient = require("../lib/myobClient");
-const { flattenRecord, pickField } = require("../repositories/myobCacheRepository");
+const { ACCOUNT_MAPPING } = require("../constants/accountMapping");
+const { flattenRecord, pickField, loadLiveGl } = require("../repositories/myobCacheRepository");
 const repo = require("../repositories/myobHistoryRepository");
 const { resolveMapping, mappingPrefix, UNMAPPED_FUNCTION } = require("./accountMappingService");
+const { classifyAccounts, lineKind } = require("./commandCentreDerivation");
 const { flattenJournalLines } = require("./myobSyncService");
 
 const PAGE_SIZE = 500;
@@ -246,6 +248,222 @@ async function approveFy(fy, { db } = {}) {
 }
 
 // ---------------------------------------------------------------------------
+// Historical derivations for the copilot (Mongo only — no network). Every
+// derivation answers ONLY for FYs that passed the mapping gate
+// (visibleHistoryFys); a gated, absent or invalid FY returns a structured
+// { available: false } result — never a throw — so the LLM tool loop can
+// relay the coverage limit instead of crashing to the deterministic fallback.
+// ---------------------------------------------------------------------------
+
+// The structured refusal every historical derivation shares.
+function fyNotAvailable(fy, reason, visibleFys) {
+  return { fy, available: false, reason, visibleFys };
+}
+
+// Chart classes for line classification — injected accounts (tests) or the
+// live-gl cache's chart (same 6-digit CoA scheme across every stored FY, per
+// the probe). With no chart at all, lineKind's default sweep treats every
+// line as expense, the same rule the current-year derivation applies.
+function chartClasses(accounts) {
+  if (accounts) return classifyAccounts(accounts);
+  const { data } = loadLiveGl();
+  return classifyAccounts(data && Array.isArray(data.accounts) ? data.accounts : []);
+}
+
+// One FY's raw lines through the SAME normalization the current-year
+// derivation applies: chart class -> income/expense/skip, net_debit falling
+// back to debit-credit, income sign-flipped (credit-normal), balance-sheet
+// skipped. Expense lines are bucketed per function via the versioned mapping
+// resolver, with unresolved prefixes in the explicit Unmapped bucket.
+function aggregateFyLines(lines, fy, classes) {
+  const spentByFunction = new Map();
+  const actualByAccount = new Map();
+  let income = 0;
+  let expense = 0;
+  for (const line of lines) {
+    const kind = lineKind(classes.get(String(line.account ?? "")));
+    if (kind === "skip") continue;
+    const netDebit =
+      line.net_debit === undefined || line.net_debit === null
+        ? (Number(line.debit) || 0) - (Number(line.credit) || 0)
+        : Number(line.net_debit) || 0;
+    const amount = kind === "income" ? -netDebit : netDebit;
+    if (kind === "income") income += amount;
+    else expense += amount;
+    const account = String(line.account ?? "");
+    actualByAccount.set(account, (actualByAccount.get(account) || 0) + amount);
+    if (kind === "expense") {
+      const mapping = resolveMapping(line.subaccount, fy);
+      const functionName = mapping ? mapping.functionName : UNMAPPED_FUNCTION;
+      const agg = spentByFunction.get(functionName) || { functionName, lineCount: 0, spent: 0 };
+      agg.lineCount += 1;
+      agg.spent += amount;
+      spentByFunction.set(functionName, agg);
+    }
+  }
+  return { income, expense, spentByFunction, actualByAccount };
+}
+
+// Shared gate + window + line pull for the single-FY derivations. Returns
+// { window, visibleFys, agg } or { refusal } when the FY is invalid, gated or
+// never backfilled.
+async function visibleFyAgg(fy, { db, accounts } = {}) {
+  const visibleFys = await visibleHistoryFys({ db });
+  let window;
+  try {
+    window = fyWindow(fy);
+  } catch (error) {
+    return { refusal: fyNotAvailable(String(fy), error.message, visibleFys) };
+  }
+  if (!visibleFys.includes(window.fy)) {
+    return {
+      refusal: fyNotAvailable(
+        window.fy,
+        `${window.fy} is not in the visible history (complete and mapping-gated financial years only)`,
+        visibleFys
+      ),
+    };
+  }
+  const lines = await repo.listJournalLinesByDate(window.fromDate, window.toDate, { db });
+  return { window, visibleFys, agg: aggregateFyLines(lines, window.fy, chartClasses(accounts)) };
+}
+
+// Per-function expense totals for one visible FY (copilot tool
+// fy_spend_by_function). Rounding matches the live derivation: whole dollars
+// via Math.round after summing.
+async function fySpendByFunction(fy, { db, accounts } = {}) {
+  const { refusal, window, agg } = await visibleFyAgg(fy, { db, accounts });
+  if (refusal) return refusal;
+  const income = Math.round(agg.income);
+  const expense = Math.round(agg.expense);
+  return {
+    fy: window.fy,
+    available: true,
+    totals: { income, expense, net: income - expense },
+    functions: [...agg.spentByFunction.values()]
+      .map((fn) => ({ ...fn, spent: Math.round(fn.spent) }))
+      .sort((a, b) => b.spent - a.spent),
+  };
+}
+
+// Budget vs actual per account for one visible FY (copilot tool
+// budget_vs_actual) — only meaningful where budget rows exist for that FY.
+// "manual" rows win over "myob" for the same account (the tenant's Budget
+// entity is broken server-side, so "myob" stays reserved). Actuals use the
+// same signed normalization as fySpendByFunction; unbudgetedActual keeps the
+// answer honest when actuals extend past the budgeted accounts.
+async function budgetVsActual(fy, { db, accounts } = {}) {
+  const { refusal, window, visibleFys, agg } = await visibleFyAgg(fy, { db, accounts });
+  if (refusal) return refusal;
+  const budgets = await repo.listBudgetsByFy(window.fy, { db });
+  if (budgets.length === 0) {
+    return fyNotAvailable(
+      window.fy,
+      `${window.fy} has no budget rows loaded (import a file with scripts/import-budgets.js)`,
+      visibleFys
+    );
+  }
+  const budgetByAccount = new Map();
+  for (const source of ["myob", "manual"]) {
+    for (const row of budgets) {
+      if (row.source === source) budgetByAccount.set(row.account, { budget: row.amount, source: row.source });
+    }
+  }
+  const rows = [...budgetByAccount.entries()]
+    .map(([account, { budget, source }]) => {
+      const actual = Math.round(agg.actualByAccount.get(account) || 0);
+      return { account, source, budget, actual, variance: budget - actual };
+    })
+    .sort((a, b) => (a.account < b.account ? -1 : a.account > b.account ? 1 : 0));
+  const totals = rows.reduce(
+    (acc, row) => ({
+      budget: acc.budget + row.budget,
+      actual: acc.actual + row.actual,
+      variance: acc.variance + row.variance,
+    }),
+    { budget: 0, actual: 0, variance: 0 }
+  );
+  let unbudgetedActual = 0;
+  for (const [account, actual] of agg.actualByAccount) {
+    if (!budgetByAccount.has(account)) unbudgetedActual += actual;
+  }
+  return { fy: window.fy, available: true, rows, totals, unbudgetedActual: Math.round(unbudgetedActual) };
+}
+
+// Function names spendTrend accepts: every mapped function plus the Unmapped
+// bucket itself (so the trend of unmapped spend is also queryable).
+function knownFunctionNames() {
+  return [...new Set(ACCOUNT_MAPPING.map((entry) => entry.functionName)), UNMAPPED_FUNCTION];
+}
+
+// Spend for one function across a FY range (copilot tool spend_trend). Only
+// visible FYs are queried; gated/absent years inside the range land in
+// skippedFys so the model can state the gap instead of interpolating it.
+async function spendTrend(functionName, fromFy, toFy, { db, accounts } = {}) {
+  const visibleFys = await visibleHistoryFys({ db });
+  const refuse = (reason) => ({
+    functionName: String(functionName),
+    fromFy: String(fromFy),
+    toFy: String(toFy),
+    available: false,
+    reason,
+    visibleFys,
+  });
+  let from;
+  let to;
+  try {
+    from = fyWindow(fromFy);
+    to = fyWindow(toFy);
+  } catch (error) {
+    return refuse(error.message);
+  }
+  const fromYear = Number(from.fy.slice(2));
+  const toYear = Number(to.fy.slice(2));
+  if (fromYear > toYear) return refuse(`${from.fy} is after ${to.fy}`);
+  const names = knownFunctionNames();
+  const canonical = names.find((name) => name.toLowerCase() === String(functionName ?? "").trim().toLowerCase());
+  if (!canonical) return refuse(`unknown function "${functionName}" (known: ${names.join(", ")})`);
+  const classes = chartClasses(accounts);
+  const points = [];
+  const skippedFys = [];
+  for (let year = fromYear; year <= toYear; year += 1) {
+    const window = fyWindow(year);
+    if (!visibleFys.includes(window.fy)) {
+      skippedFys.push(window.fy);
+      continue;
+    }
+    const lines = await repo.listJournalLinesByDate(window.fromDate, window.toDate, { db });
+    const agg = aggregateFyLines(lines, window.fy, classes);
+    const fn = agg.spentByFunction.get(canonical);
+    points.push({ fy: window.fy, spent: Math.round(fn ? fn.spent : 0) });
+  }
+  if (points.length === 0) return refuse("no visible history in that range");
+  return { functionName: canonical, fromFy: from.fy, toFy: to.fy, available: true, points, skippedFys };
+}
+
+// Coverage facts for the copilot's "Historical data coverage" grounding
+// section: the data floor, the FYs past the mapping gate, and which FYs have
+// budget rows (by source). Returns null when the history store is unavailable
+// (MONGODB_URI unset and no injected db) or unreadable — the prompt then says
+// historical data is unavailable instead of guessing.
+async function historyCoverage({ db } = {}) {
+  if (!db && !config.mongoUri) return null;
+  try {
+    const states = await repo.listSyncStates({ db });
+    const complete = states.filter((state) => state.status === "complete");
+    const floorDate = complete.length > 0 ? complete[0].fromDate ?? null : null;
+    return {
+      floorDate,
+      visibleFys: states.filter(fyIsVisible).map((state) => state.fy),
+      budgetFys: await repo.listBudgetFys({ db }),
+    };
+  } catch (error) {
+    console.warn(`myob history: coverage unavailable (${error.message})`);
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Backfill runs (network — one login/logout bracket per run, GET only)
 // ---------------------------------------------------------------------------
 
@@ -362,6 +580,11 @@ module.exports = {
   visibleHistoryFys,
   fyIsVisible,
   UNMAPPED_SHARE_GATE,
+  // historical derivations + coverage facts for the copilot layer
+  fySpendByFunction,
+  budgetVsActual,
+  spendTrend,
+  historyCoverage,
   // pure helpers, exported for unit tests and the import script
   fyWindow,
   currentFy,
