@@ -4,6 +4,10 @@
 process.env.CFO_DATA_DIR = "";
 process.env.DASHBOARDS_DIR = "";
 process.env.MYOB_CACHE_DIR = "";
+process.env.MYOB_URL = "";
+process.env.MYOB_USERNAME = "";
+process.env.MYOB_PASSWORD = "";
+process.env.MONGODB_URI = "";
 // Pin the copilot LLM off so the suite never touches the network — copilot
 // answers must come from the deterministic contract §5 path.
 process.env.COPILOT_LLM_DISABLED = "1";
@@ -120,6 +124,44 @@ test("copilot never states a cash-on-hand figure", async () => {
   const result = await service.postCopilot({ messages: [{ role: "user", content: "What is our cash on hand right now?" }] });
   assert.ok(!/cash on hand of \$/i.test(result.data.answer));
   assert.deepEqual(result.data.matched, { kind: "general", id: null });
+});
+
+test("copilot answers MYOB history coverage questions without guessing", async () => {
+  const result = await service.postCopilot({
+    messages: [{ role: "user", content: "How long can /decisions get from MYOB? Can it pull previous data?" }],
+  });
+  assert.deepEqual(result.data.matched, { kind: "general", id: null });
+  assert.match(result.data.answer, /no live MYOB GL cache configured/i);
+  assert.match(result.data.answer, /Prior financial years are not available/i);
+  assert.match(result.data.answer, /read-only to backfill older JournalTransaction windows/i);
+  assert.match(result.data.answer, /until that backfill is complete \/decisions should treat previous-year data as unavailable/i);
+});
+
+test("copilot reports MYOB sync status and refuses refresh without configuration", async () => {
+  const status = await service.postCopilot({
+    messages: [{ role: "user", content: "What is the MYOB API sync status?" }],
+  });
+  assert.deepEqual(status.data.matched, { kind: "general", id: null });
+  assert.match(status.data.answer, /No MYOB sync run has been recorded/i);
+  assert.match(status.data.answer, /no live MYOB GL cache configured/i);
+
+  const refresh = await service.postCopilot({
+    messages: [{ role: "user", content: "Please refresh MYOB from the API" }],
+  });
+  assert.deepEqual(refresh.data.matched, { kind: "general", id: null });
+  assert.match(refresh.data.answer, /cannot start a MYOB sync because MYOB_CACHE_DIR or CFO_DATA_DIR is not configured/i);
+});
+
+test("copilot explains historical quarterly budget limits for prior-year Youth questions", async () => {
+  const result = await service.postCopilot({
+    messages: [{ role: "user", content: "how much was the budget of the youth 3 years ago for the first quarter?" }],
+  });
+  assert.deepEqual(result.data.matched, { kind: "general", id: null });
+  assert.match(result.data.answer, /Youth Ministry FY2023 Q1 \(2022-07-01 to 2022-09-30\)/);
+  assert.match(result.data.answer, /JournalTransaction backfill provides actuals, not budget authority/i);
+  assert.match(result.data.answer, /MYOB Budget entity is unavailable server-side/i);
+  assert.match(result.data.answer, /does not currently have budget rows for FY2023/i);
+  assert.match(result.data.answer, /If you want the Q1 actual spend instead/i);
 });
 
 test("copilot serves the deterministic answer when the LLM path is disabled", async () => {

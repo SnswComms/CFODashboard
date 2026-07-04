@@ -13,6 +13,7 @@ const { readJsonFile } = require("../repositories/jsonFileRepository");
 const { buildLiveModel } = require("./commandCentreDerivation");
 const { observationSentence } = require("./observationService");
 const history = require("./myobHistoryService");
+const myobSync = require("./myobSyncService");
 const {
   GENERATED_AT,
   APPROVED_TOTALS,
@@ -570,11 +571,200 @@ function generalAnswer() {
   return { answer, matched: { kind: "general", id: null } };
 }
 
+function isMyobCoverageQuestion(q) {
+  const asksMyob = /\bmyob\b/.test(q);
+  const asksHistory =
+    /how (far|long)|previous|prior|histor|backfill|back fill|pull.+(back|old|previous|prior)|old data|past data|data coverage|coverage/.test(q);
+  return asksMyob && asksHistory;
+}
+
+function isHistoricalBudgetQuestion(q) {
+  return /\bbudget\b/.test(q) && /\b(previous|prior|histor|years? ago|last year|fy20\d{2}|20\d{2}|quarter|q[1-4])\b/.test(q);
+}
+
+function isMyobSyncStatusQuestion(q) {
+  return /\bmyob\b/.test(q) && /\b(status|connected|connection|sync|refresh|last run|latest|cache|api)\b/.test(q);
+}
+
+function isMyobSyncStartQuestion(q) {
+  if (!/\bmyob\b/.test(q)) return false;
+  return (
+    /\b(refresh|pull|update|reload)\b/.test(q) ||
+    /\b(start|run|trigger|kick off)\b.*\bsync\b/.test(q) ||
+    /\bsync\b.*\b(now|from api|latest|cache)\b/.test(q)
+  );
+}
+
+function describeLiveCoverage(live) {
+  if (!live) {
+    return "There is no live MYOB GL cache configured in this session, so /decisions cannot quote live MYOB figures here.";
+  }
+  const counts = live.sourceCounts || {};
+  const from = counts.from_date || "an unknown start date";
+  const to = counts.to_date || String(live.generated_at || "").slice(0, 10) || "the latest cached extract";
+  const lines = typeof counts.journal_lines === "number" ? `, with ${counts.journal_lines.toLocaleString("en-US")} journal lines cached` : "";
+  return `/decisions currently reads the live MYOB GL cache from ${from} to ${to}${lines}.`;
+}
+
+function myobCoverageAnswer(live, coverage) {
+  const liveSentence = describeLiveCoverage(live);
+  if (!coverage) {
+    return {
+      answer:
+        liveSentence +
+        " Prior financial years are not available to query from the copilot history store in this session. The MYOB API can be used read-only to backfill older JournalTransaction windows if MYOB returns them and the Mongo history store is configured, but until that backfill is complete /decisions should treat previous-year data as unavailable.",
+      matched: { kind: "general", id: null },
+    };
+  }
+  const visible = coverage.visibleFys.length > 0 ? coverage.visibleFys.join(", ") : "none";
+  const floor = coverage.floorDate ? `stored journal history starts at ${coverage.floorDate}` : "the stored journal history start date is unknown";
+  const budgets =
+    coverage.budgetFys.length > 0
+      ? coverage.budgetFys.map((entry) => `${entry.fy} (${entry.sources.join(", ")})`).join("; ")
+      : "none";
+  const priorSentence =
+    coverage.visibleFys.length > 0
+      ? `Prior financial years currently available to /decisions are: ${visible}.`
+      : "No prior financial years have passed the history visibility gate yet.";
+  return {
+    answer:
+      `${liveSentence} For history, ${floor}. ${priorSentence} Budget-vs-actual history is only available for FYs with budget rows loaded; currently: ${budgets}. If a requested year is not listed, /decisions should say it is outside available MYOB coverage rather than estimate it.`,
+    matched: { kind: "general", id: null },
+  };
+}
+
+function requestedHistoricalFy(q, now = new Date()) {
+  const explicitFy = /\bfy\s*(20\d{2})\b/i.exec(q);
+  if (explicitFy) return `FY${explicitFy[1]}`;
+  const explicitYear = /\b(20\d{2})\b/.exec(q);
+  if (explicitYear) return `FY${explicitYear[1]}`;
+  const yearsAgo = /\b(\d+)\s+years?\s+ago\b/.exec(q);
+  if (yearsAgo) {
+    const calendarYear = now.getFullYear() - Number(yearsAgo[1]);
+    return `FY${calendarYear}`;
+  }
+  return null;
+}
+
+function requestedQuarter(q) {
+  if (/\b(first|1st)\s+quarter\b|\bq1\b/.test(q)) return "Q1";
+  if (/\b(second|2nd)\s+quarter\b|\bq2\b/.test(q)) return "Q2";
+  if (/\b(third|3rd)\s+quarter\b|\bq3\b/.test(q)) return "Q3";
+  if (/\b(fourth|4th)\s+quarter\b|\bq4\b/.test(q)) return "Q4";
+  return null;
+}
+
+function fyQuarterWindow(fy, quarter) {
+  if (!fy || !quarter) return null;
+  const year = Number(String(fy).replace(/^FY/i, ""));
+  if (!Number.isInteger(year)) return null;
+  const windows = {
+    Q1: [`${year - 1}-07-01`, `${year - 1}-09-30`],
+    Q2: [`${year - 1}-10-01`, `${year - 1}-12-31`],
+    Q3: [`${year}-01-01`, `${year}-03-31`],
+    Q4: [`${year}-04-01`, `${year}-06-30`],
+  };
+  const dates = windows[quarter];
+  return dates ? `${dates[0]} to ${dates[1]}` : null;
+}
+
+function historicalBudgetAnswer(q, coverage) {
+  const fy = requestedHistoricalFy(q);
+  const quarter = requestedQuarter(q);
+  const window = fyQuarterWindow(fy, quarter);
+  const functionName = q.includes("youth") ? "Youth Ministry" : "that function";
+  const budgetFys = coverage && coverage.budgetFys ? coverage.budgetFys.map((entry) => entry.fy) : [];
+  const visibleBudgetFys = budgetFys.length > 0 ? budgetFys.join(", ") : "none";
+  const requested = [fy, quarter, window ? `(${window})` : null].filter(Boolean).join(" ");
+  const requestedSentence = requested
+    ? `I read that as ${functionName} ${requested}.`
+    : `I read that as a historical budget question for ${functionName}.`;
+  const availability =
+    fy && budgetFys.includes(fy)
+      ? `${fy} has annual budget rows loaded, but this dashboard does not yet store quarterly phasing, so it can answer annual budget-vs-actual but not a first-quarter budget allocation unless a quarterly budget import is added.`
+      : `The history store does not currently have budget rows for ${fy || "that year"}. Budget rows loaded now: ${visibleBudgetFys}.`;
+  return {
+    answer:
+      `${requestedSentence} I cannot give a reliable Q1 budget number from MYOB for that because MYOB JournalTransaction backfill provides actuals, not budget authority, and this tenant's MYOB Budget entity is unavailable server-side. ${availability} If you want the Q1 actual spend instead, load/approve the relevant MYOB journal history and ask for Youth Ministry actuals for that quarter.`,
+    matched: { kind: "general", id: null },
+  };
+}
+
+function syncStatusSentence(status) {
+  const data = status && status.data ? status.data : {};
+  if (data.running) {
+    const run = data.current_run || {};
+    return `A MYOB sync is already running; it started at ${run.startedAt || "an unknown time"}.`;
+  }
+  const run = data.last_run;
+  if (!run) return "No MYOB sync run has been recorded in this environment yet.";
+  const outcome = run.ok === true ? "succeeded" : run.ok === false ? "failed" : "has not finished";
+  const finished = run.finishedAt ? ` and finished at ${run.finishedAt}` : "";
+  const window =
+    run.from_date || run.to_date
+      ? ` The requested extract window was ${run.from_date || "open start"} to ${run.to_date || "open end"}.`
+      : "";
+  const errors = Array.isArray(run.errors) && run.errors.length > 0 ? ` Last error: ${run.errors[0]}.` : "";
+  return `The last MYOB sync ${outcome}; it started at ${run.startedAt || "an unknown time"}${finished}.${window}${errors}`;
+}
+
+function myobSyncAnswer(q, live) {
+  const status = myobSync.getStatus();
+  const liveSentence = describeLiveCoverage(live);
+  if (!isMyobSyncStartQuestion(q)) {
+    return {
+      answer: `${syncStatusSentence(status)} ${liveSentence}`,
+      matched: { kind: "general", id: null },
+    };
+  }
+  if (!config.dirs.myobCache) {
+    return {
+      answer:
+        "I cannot start a MYOB sync because MYOB_CACHE_DIR or CFO_DATA_DIR is not configured for this environment. " +
+        `${syncStatusSentence(status)} ${liveSentence}`,
+      matched: { kind: "general", id: null },
+    };
+  }
+  if (!config.myob.url || !config.myob.username || !config.myob.password) {
+    return {
+      answer:
+        "I cannot start a MYOB sync because MYOB_URL, MYOB_USERNAME or MYOB_PASSWORD is not fully configured. " +
+        `${syncStatusSentence(status)} ${liveSentence}`,
+      matched: { kind: "general", id: null },
+    };
+  }
+  try {
+    const result = myobSync.startSync();
+    const started = result.started;
+    const runStatus = result.status || myobSync.getStatus();
+    return {
+      answer: started
+        ? `Started a read-only MYOB sync. ${syncStatusSentence(runStatus)} ${liveSentence}`
+        : `A MYOB sync is already in progress. ${syncStatusSentence(runStatus)} ${liveSentence}`,
+      matched: { kind: "general", id: null },
+    };
+  } catch (error) {
+    return {
+      answer: `I could not start a MYOB sync: ${error.message}. ${syncStatusSentence(status)} ${liveSentence}`,
+      matched: { kind: "general", id: null },
+    };
+  }
+}
+
 // Deterministic keyword-matched result (contract §5). Always computed even on
 // the LLM path: it supplies matched {kind,id} and is the network-free fallback.
 // Same matching logic either way; live mode only swaps in derived figures so
 // the canned answers cite real remaining amounts.
-function deterministicCopilot(q, live, meta) {
+function deterministicCopilot(q, live, meta, coverage = null) {
+  if (isMyobSyncStatusQuestion(q)) {
+    return { data: myobSyncAnswer(q, live), meta };
+  }
+  if (isHistoricalBudgetQuestion(q)) {
+    return { data: historicalBudgetAnswer(q, coverage), meta };
+  }
+  if (isMyobCoverageQuestion(q)) {
+    return { data: myobCoverageAnswer(live, coverage), meta };
+  }
   const lane = matchLane(q, live ? live.lanes : LANES_RAW);
   if (lane) {
     return { data: laneAnswer(lane, extractAmount(q)), meta };
@@ -732,7 +922,13 @@ async function postCopilot(body, range = {}) {
   const q = validateMessages(body);
   const live = liveModel(range);
   const meta = live ? live.meta : META;
-  const fallback = deterministicCopilot(q, live, meta);
+  const operationalMyobQuestion = isMyobSyncStatusQuestion(q) || isMyobCoverageQuestion(q) || isHistoricalBudgetQuestion(q);
+  const needsCoverage = config.copilot.llmEnabled || isMyobCoverageQuestion(q) || isHistoricalBudgetQuestion(q);
+  const coverage = needsCoverage ? await history.historyCoverage() : null;
+  const fallback = deterministicCopilot(q, live, meta, coverage);
+  if (operationalMyobQuestion) {
+    return fallback;
+  }
   if (!config.copilot.llmEnabled) {
     return fallback;
   }
@@ -740,7 +936,6 @@ async function postCopilot(body, range = {}) {
     // Historical grounding + tools ride along only when the Mongo history
     // store is reachable AND at least one FY passed the mapping gate; the
     // coverage helper never throws, so the current-FY path is untouched.
-    const coverage = await history.historyCoverage();
     const historyReady = Boolean(coverage) && coverage.visibleFys.length > 0;
     const answer = await chatComplete({
       system: copilotSystemPrompt(live, fallback.data.answer, coverage),

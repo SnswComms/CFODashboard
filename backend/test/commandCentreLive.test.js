@@ -10,9 +10,13 @@ const path = require("node:path");
 // the config module snapshots env at require time.
 const cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), "cc-live-gl-"));
 process.env.MYOB_CACHE_DIR = cacheDir;
+process.env.MYOB_URL = "";
+process.env.MYOB_USERNAME = "";
+process.env.MYOB_PASSWORD = "";
 process.env.CFO_DATA_DIR = "";
 process.env.DASHBOARDS_DIR = "";
 process.env.SYNTHETIC_DIR = "";
+process.env.MONGODB_URI = "";
 // Copilot answers asserted below are the deterministic ones — keep the LLM
 // path off so the suite never touches the network.
 process.env.COPILOT_LLM_DISABLED = "1";
@@ -313,6 +317,34 @@ test("POST /copilot cites live-derived lane and function figures", async () => {
     });
     assert.deepEqual(youth.body.data.matched, { kind: "lane", id: "youth" });
     assert.match(youth.body.data.answer, /spent figure is unverified — check source/);
+
+    const coverage = await requestJson(base, "/api/command-centre/copilot", {
+      method: "POST",
+      body: { messages: [{ role: "user", content: "How far back can /decisions pull MYOB previous data?" }] },
+    });
+    assert.equal(coverage.status, 200);
+    assert.equal(coverage.body.meta.dataSource, "live-cache");
+    assert.deepEqual(coverage.body.data.matched, { kind: "general", id: null });
+    assert.match(coverage.body.data.answer, /reads the live MYOB GL cache from 2026-01-01 to 2026-06-30/);
+    assert.match(coverage.body.data.answer, /8 journal lines cached/);
+    assert.match(coverage.body.data.answer, /Prior financial years are not available/);
+    assert.match(coverage.body.data.answer, /read-only to backfill older JournalTransaction windows/);
+
+    const status = await requestJson(base, "/api/command-centre/copilot", {
+      method: "POST",
+      body: { messages: [{ role: "user", content: "What is the MYOB sync status?" }] },
+    });
+    assert.equal(status.status, 200);
+    assert.match(status.body.data.answer, /No MYOB sync run has been recorded/);
+    assert.match(status.body.data.answer, /live MYOB GL cache from 2026-01-01 to 2026-06-30/);
+
+    const refresh = await requestJson(base, "/api/command-centre/copilot", {
+      method: "POST",
+      body: { messages: [{ role: "user", content: "Refresh MYOB from the API now" }] },
+    });
+    assert.equal(refresh.status, 200);
+    assert.match(refresh.body.data.answer, /cannot start a MYOB sync because MYOB_URL, MYOB_USERNAME or MYOB_PASSWORD is not fully configured/);
+    assert.match(refresh.body.data.answer, /live MYOB GL cache from 2026-01-01 to 2026-06-30/);
   });
 });
 
