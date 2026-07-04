@@ -8,7 +8,7 @@
 const config = require("../config");
 const { BadRequestError } = require("../lib/errors");
 const { chatComplete } = require("../lib/qwenClient");
-const { loadLiveGl } = require("../repositories/myobCacheRepository");
+const { loadLiveGlForRange } = require("../repositories/myobCacheRepository");
 const { readJsonFile } = require("../repositories/jsonFileRepository");
 const { buildLiveModel } = require("./commandCentreDerivation");
 const { observationSentence } = require("./observationService");
@@ -36,6 +36,22 @@ const {
 } = require("../constants/commandCentre");
 
 const META = { dataSource: "synthetic" };
+
+const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const SYNTHETIC_MONTH_WEIGHTS = [0.18, 0.19, 0.2, 0.21, 0.22];
+
+function syntheticMonthlyOperating() {
+  const incomeYtd = COMPOSITION.find((item) => item.label === "Income")?.spent ?? 0;
+  const expenseYtd = COMPOSITION.find((item) => item.label === "Expense")?.spent ?? 0;
+  return MONTH_LABELS.map((label, index) => {
+    if (index >= SYNTHETIC_MONTH_WEIGHTS.length) {
+      return { month: index + 1, label, income: null, expense: null, net: null };
+    }
+    const income = Math.round(incomeYtd * SYNTHETIC_MONTH_WEIGHTS[index]);
+    const expense = Math.round(expenseYtd * SYNTHETIC_MONTH_WEIGHTS[index]);
+    return { month: index + 1, label, income, expense, net: income - expense };
+  });
+}
 
 // Data-health warnings for live responses (live mode only — synthetic meta
 // never carries them): sync errors embedded in the cache doc by the sync run
@@ -78,14 +94,45 @@ function liveHealth(doc) {
   return { warnings, stale };
 }
 
+function rangeCoverage(doc, range = {}) {
+  const warnings = [];
+  const notes = [];
+  const cacheFrom = doc.from_date || null;
+  const cacheTo = doc.to_date || null;
+  if (range.fromDate && cacheFrom && cacheFrom > range.fromDate) {
+    warnings.push(
+      `Requested ${rangeLabelForWarning(range)} from ${range.fromDate}, but the current MYOB cache starts at ${cacheFrom}. Figures are limited to the cached extract window.`,
+    );
+  }
+  if (range.toDate && cacheTo && cacheTo < range.toDate) {
+    const message = `Requested ${rangeLabelForWarning(range)} to ${range.toDate}, but the current MYOB cache ends at ${cacheTo}. Figures are limited to the cached extract window.`;
+    if (String(range.label || "").startsWith("Full year FY")) notes.push(message);
+    else warnings.push(message);
+  }
+  return { warnings, notes };
+}
+
+function rangeLabelForWarning(range = {}) {
+  return range.label || (range.fromDate && range.toDate ? `${range.fromDate} to ${range.toDate}` : "date range");
+}
+
 // Live-gl cache model, or null when only the synthetic fixture is available.
 // loadLiveGl falls back to fixtures/myob-live-gl.json, but the command centre
 // deliberately ignores that fallback — its synthetic contract is the design
 // constants above, not sums over the fixture.
-function liveModel() {
-  const { data, meta } = loadLiveGl();
+function liveModel(range = {}) {
+  const { data, meta } = loadLiveGlForRange(range);
   if (meta.dataSource !== "live-cache" || !data || !Array.isArray(data.journal_lines)) return null;
-  return buildLiveModel(data, meta, liveHealth(data));
+  const health = liveHealth(data);
+  const coverage = rangeCoverage(data, range);
+  const model = buildLiveModel(
+    data,
+    meta,
+    { ...health, warnings: [...health.warnings, ...coverage.warnings] },
+    range,
+  );
+  if (coverage.notes.length > 0) model.meta.extra = { ...(model.meta.extra || {}), coverage_notes: coverage.notes };
+  return model;
 }
 
 // ---- shared derivation helpers (contract §2 rules) ----
@@ -116,8 +163,8 @@ function fmtMoney(x) {
 
 // ---- GET endpoints ----
 
-function getOverview() {
-  const live = liveModel();
+function getOverview(range = {}) {
+  const live = liveModel(range);
   if (!live) {
     return {
       data: {
@@ -151,8 +198,8 @@ function getOverview() {
 
 // Async because of the LLM-written observation line (observationService) —
 // cached per data fingerprint, so the hop only happens when the GL changes.
-async function getFunctions() {
-  const live = liveModel();
+async function getFunctions(range = {}) {
+  const live = liveModel(range);
   if (live) {
     return {
       data: {
@@ -162,6 +209,7 @@ async function getFunctions() {
         composition: live.composition,
         observation: await observationSentence(live),
         functions: live.functions,
+        monthly: live.monthlyOperating,
       },
       meta: live.meta,
     };
@@ -178,13 +226,14 @@ async function getFunctions() {
       composition: COMPOSITION,
       observation: OBSERVATION,
       functions,
+      monthly: syntheticMonthlyOperating(),
     },
     meta: META,
   };
 }
 
-function getDepartments() {
-  const live = liveModel();
+function getDepartments(range = {}) {
+  const live = liveModel(range);
   if (live) {
     return {
       data: {
@@ -214,8 +263,8 @@ function getDepartments() {
   return { data: { generated_at: GENERATED_AT, departments }, meta: META };
 }
 
-function getLanes() {
-  const live = liveModel();
+function getLanes(range = {}) {
+  const live = liveModel(range);
   if (live) {
     return {
       data: {
@@ -257,8 +306,8 @@ function getField() {
   return { data: { generated_at: GENERATED_AT, stats: FIELD_STATS, load_buckets: LOAD_BUCKETS }, meta: META };
 }
 
-function getEntities() {
-  const live = liveModel();
+function getEntities(range = {}) {
+  const live = liveModel(range);
   if (live) {
     return {
       data: { generated_at: live.generated_at, entities: live.entities, total: live.entityTotal },
@@ -277,8 +326,8 @@ function getEntities() {
   };
 }
 
-function getSources() {
-  const live = liveModel();
+function getSources(range = {}) {
+  const live = liveModel(range);
   if (live) {
     // Live evidence describes the actual extract (counts + window) instead of
     // the design-era EVIDENCE rows, whose figures only match synthetic mode.
@@ -679,9 +728,9 @@ const COPILOT_LLM_TURNS = 12;
 // Async because of the LLM hop. Any LLM failure (disabled, timeout, non-2xx,
 // empty answer) degrades to the deterministic result, so the endpoint never
 // fails harder than the pre-LLM contract.
-async function postCopilot(body) {
+async function postCopilot(body, range = {}) {
   const q = validateMessages(body);
-  const live = liveModel();
+  const live = liveModel(range);
   const meta = live ? live.meta : META;
   const fallback = deterministicCopilot(q, live, meta);
   if (!config.copilot.llmEnabled) {

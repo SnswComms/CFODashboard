@@ -9,6 +9,7 @@
 
 import { useCallback, useState } from 'react';
 import { useApiGet } from '@/lib/api';
+import { useDateRange } from '@/lib/dateRange';
 import MetricRefreshControl from '@/components/MetricRefreshControl';
 import type { MetricRefreshDoc } from '@/lib/useMetricRefresh';
 import { deptRaw } from '@/lib/designData';
@@ -117,7 +118,8 @@ const statusCls = (status: Dept['status']): 'good' | 'warn' | 'bad' =>
   status === 'over' ? 'bad' : status === 'tight' ? 'warn' : 'good';
 
 export default function Departments() {
-  const payload = useApiGet<DepartmentsPayload>('/command-centre/departments', fallbackPayload);
+  const dateRange = useDateRange();
+  const payload = useApiGet<DepartmentsPayload>(`/command-centre/departments?${dateRange.query}`, fallbackPayload);
   const paceRows = useApiGet<PaceRow[]>('/api/budget/departments/pace', PACE_FALLBACK);
   const [search, setSearch] = useState('');
   const [modalName, setModalName] = useState<string | null>(null);

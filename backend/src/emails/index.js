@@ -127,6 +127,41 @@ function mutedPara(html) {
   return `<p style="margin:8px 0 0 0;font-family:${FONT};font-size:13px;line-height:20px;color:${MUTED};">${html}</p>`;
 }
 
+function fmtCurrency(value) {
+  const n = Math.round(Math.abs(Number(value) || 0)).toLocaleString("en-AU");
+  return Number(value) < 0 ? `($${n})` : `$${n}`;
+}
+
+function fmtPct(value) {
+  return value === null || value === undefined ? "n/a" : `${Number(value).toFixed(1)}%`;
+}
+
+function metricCell(label, value, note, color = INK) {
+  return `
+                  <td width="50%" style="padding:10px;border:1px solid ${BORDER};border-radius:8px;">
+                    <div style="font-family:${FONT};font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:${FAINT};">${esc(label)}</div>
+                    <div style="margin-top:8px;font-family:${FONT};font-size:22px;line-height:28px;font-weight:600;color:${INK};">${esc(value)}</div>
+                    <div style="margin-top:3px;font-family:${FONT};font-size:12px;line-height:18px;color:${color};">${esc(note)}</div>
+                  </td>`;
+}
+
+function monthlyRows(church) {
+  return (church.monthly || [])
+    .map((row) => {
+      const current = Number(row.current) || 0;
+      const prior = Number(row.prior) || 0;
+      const delta = current && prior ? ((current - prior) / prior) * 100 : null;
+      return `
+                    <tr>
+                      <td style="padding:7px 0;border-bottom:1px solid ${BORDER};font-family:${FONT};font-size:12px;color:${INK};">${esc(row.month)}</td>
+                      <td align="right" style="padding:7px 0;border-bottom:1px solid ${BORDER};font-family:${FONT};font-size:12px;color:${INK};">${current ? esc(fmtCurrency(current)) : "&#8212;"}</td>
+                      <td align="right" style="padding:7px 0;border-bottom:1px solid ${BORDER};font-family:${FONT};font-size:12px;color:${MUTED};">${esc(fmtCurrency(prior))}</td>
+                      <td align="right" style="padding:7px 0;border-bottom:1px solid ${BORDER};font-family:${FONT};font-size:12px;color:${delta === null ? FAINT : delta >= 0 ? GOOD : BAD};">${delta === null ? "&#8212;" : esc(fmtPct(delta))}</td>
+                    </tr>`;
+    })
+    .join("\n");
+}
+
 const TEXT_FOOTER =
   "South NSW Conference · local finance workspace\n" +
   "You received this email because an administrator manages your CFO Dashboard account.";
@@ -319,10 +354,74 @@ function renderAccountStatusEmail({ name, banned, reason }) {
   return { subject, html, text };
 }
 
+function renderTitheOnePagerEmail({ church, conference }) {
+  const metrics = church.metrics || {};
+  const subject = `${church.name} tithe faithfulness — ${conference.as_of || "monthly update"}`;
+  const yoyColor = Number(metrics.yoy_delta) >= 0 ? GOOD : BAD;
+  const html = layout({
+    title: subject,
+    preheader: `${church.name} tithe giving, year-over-year tracking and conference contribution share.`,
+    accent: GOLD,
+    expires: false,
+    bodyHtml: [
+      heading(`${esc(church.name)} tithe faithfulness`),
+      para(`Monthly transparency update for ${esc(conference.as_of || "the current reporting period")}.`),
+      `<table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="margin:20px 0 12px 0;">
+                <tr>
+${metricCell("Local tithe · YTD", fmtCurrency(metrics.current_ytd), `${fmtCurrency(metrics.yoy_delta)} vs last year`, yoyColor)}
+                  <td width="12" style="font-size:0;line-height:0;">&nbsp;</td>
+${metricCell("Conference share", fmtPct(metrics.conference_share_pct), "of conference tithe YTD", GOLD)}
+                </tr>
+                <tr><td colspan="3" height="12" style="font-size:0;line-height:0;">&nbsp;</td></tr>
+                <tr>
+${metricCell("Year-over-year", fmtPct(metrics.yoy_pct), `${metrics.months_reported || 0} months reported`, yoyColor)}
+                  <td width="12" style="font-size:0;line-height:0;">&nbsp;</td>
+${metricCell("Projected full year", fmtCurrency(metrics.projected_full_year), `${fmtPct(metrics.projected_vs_prior_pct)} vs prior year`, Number(metrics.projected_vs_prior_pct) >= 0 ? GOOD : BAD)}
+                </tr>
+              </table>`,
+      `<h2 style="margin:20px 0 8px 0;font-family:${FONT};font-size:15px;line-height:22px;color:${INK};">Month by month</h2>
+              <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0">
+                <tr>
+                  <th align="left" style="padding:0 0 8px 0;font-family:${FONT};font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:${FAINT};">Month</th>
+                  <th align="right" style="padding:0 0 8px 0;font-family:${FONT};font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:${FAINT};">This year</th>
+                  <th align="right" style="padding:0 0 8px 0;font-family:${FONT};font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:${FAINT};">Last year</th>
+                  <th align="right" style="padding:0 0 8px 0;font-family:${FONT};font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:${FAINT};">YoY</th>
+                </tr>
+${monthlyRows(church)}
+              </table>`,
+      mutedPara(
+        `${esc(church.name)} represents ${esc(fmtPct(metrics.conference_share_pct))} of ${esc(conference.name || "the conference")} tithe received year-to-date. ${esc(conference.churches_reporting || 0)} of ${esc(conference.churches_total || 0)} churches have reported for this cycle.`
+      ),
+      mutedPara("Figures are draft until month-end close and treasury reconciliation are complete."),
+    ].join("\n"),
+  });
+  const text = textBody([
+    `${church.name} tithe faithfulness — ${conference.as_of || "monthly update"}`,
+    "",
+    `Local tithe YTD: ${fmtCurrency(metrics.current_ytd)} (${fmtCurrency(metrics.yoy_delta)} vs last year)`,
+    `Year-over-year: ${fmtPct(metrics.yoy_pct)}`,
+    `Conference share: ${fmtPct(metrics.conference_share_pct)} of conference tithe YTD`,
+    `Projected full year: ${fmtCurrency(metrics.projected_full_year)} (${fmtPct(metrics.projected_vs_prior_pct)} vs prior year)`,
+    "",
+    "Month by month:",
+    ...((church.monthly || []).map((row) => {
+      const current = Number(row.current) || 0;
+      const prior = Number(row.prior) || 0;
+      const delta = current && prior ? ((current - prior) / prior) * 100 : null;
+      return `${row.month}: ${current ? fmtCurrency(current) : "-"} this year / ${fmtCurrency(prior)} last year / ${fmtPct(delta)} YoY`;
+    })),
+    "",
+    `${church.name} represents ${fmtPct(metrics.conference_share_pct)} of ${conference.name || "the conference"} tithe received year-to-date.`,
+    "Figures are draft until month-end close and treasury reconciliation are complete.",
+  ]);
+  return { subject, html, text };
+}
+
 module.exports = {
   renderVerificationEmail,
   renderPasswordResetEmail,
   renderWelcomeEmail,
   renderPasswordChangedEmail,
   renderAccountStatusEmail,
+  renderTitheOnePagerEmail,
 };

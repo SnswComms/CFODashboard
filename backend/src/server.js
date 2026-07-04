@@ -2,6 +2,7 @@ const config = require("./config");
 const createApp = require("./app");
 const { connectMongo, closeMongo } = require("./lib/mongo");
 const { startScheduler } = require("./services/myobSyncService");
+const { startMonthlyEmailScheduler } = require("./services/titheService");
 
 async function main() {
   try {
@@ -17,6 +18,7 @@ async function main() {
   });
 
   startScheduler();
+  startMonthlyEmailScheduler();
 
   const shutdown = () => {
     server.close(async () => {

@@ -4,6 +4,7 @@ import { isViewKey, viewKeys } from '@/lib/designData';
 import type { ViewKey } from '@/lib/designData';
 import Overview from '@/components/views/Overview';
 import Operating from '@/components/views/Operating';
+import Tithe from '@/components/views/Tithe';
 import Departments from '@/components/views/Departments';
 import Decisions from '@/components/views/Decisions';
 import Staffing from '@/components/views/Staffing';
@@ -16,6 +17,7 @@ import Admin from '@/components/views/Admin';
 const VIEWS: Record<ViewKey, ComponentType> = {
   overview: Overview,
   operating: Operating,
+  tithe: Tithe,
   departments: Departments,
   decisions: Decisions,
   staffing: Staffing,

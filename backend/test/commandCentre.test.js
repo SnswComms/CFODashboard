@@ -162,6 +162,10 @@ test("GET /api/command-centre/functions returns all 12 functions with derived ma
     assert.equal(body.data.kpis.length, 4);
     assert.equal(body.data.composition.length, 2);
     assert.equal(typeof body.data.observation, "string");
+    assert.equal(body.data.monthly.length, 12);
+    assert.deepEqual(body.data.monthly[0], { month: 1, label: "Jan", income: 591120, expense: 616140, net: -25020 });
+    assert.deepEqual(body.data.monthly[4], { month: 5, label: "May", income: 722480, expense: 753060, net: -30580 });
+    assert.deepEqual(body.data.monthly[5], { month: 6, label: "Jun", income: null, expense: null, net: null });
     assert.deepEqual(body.data.functions.map((fn) => fn.name), FUNCTION_NAMES);
     for (const fn of body.data.functions) {
       assert.equal(fn.spent, Math.round((fn.budget * fn.used_pct) / 100));

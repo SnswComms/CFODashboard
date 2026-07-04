@@ -9,6 +9,7 @@
     "dev:server": "nodemon src/server.js",
     "db:tunnel": "python scripts/db-tunnel.py",
     "backfill": "node scripts/backfill-history.js",
+    "send:tithe-monthly": "node scripts/send-tithe-monthly-emails.js",
     "test": "node --test"
   },
   "keywords": [],

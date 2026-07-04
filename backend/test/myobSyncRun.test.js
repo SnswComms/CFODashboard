@@ -86,6 +86,7 @@ test("a throwing JournalTransaction fetch leaves journal-derived caches untouche
 
 test("a custom window overrides the from-date and bounds the journal fetch", async () => {
   let journalOpts = null;
+  writeSentinel(LIVE_GL_LATEST, "canonical-live-gl");
   myobClient.pagedFetch = async (session, entity, opts) => {
     if (entity === "JournalTransaction") {
       journalOpts = opts;
@@ -108,13 +109,17 @@ test("a custom window overrides the from-date and bounds the journal fetch", asy
     "TransactionDate ge datetimeoffset'2025-01-01' and TransactionDate le datetimeoffset'2025-06-30'"
   );
 
-  const liveGl = readJson(LIVE_GL_LATEST);
+  assert.deepEqual(readJson(LIVE_GL_LATEST), { sentinel: "canonical-live-gl" });
+  const windowFile = path.join(cacheDir, "live-gl", "windows", "myob-live-gl-2025-01-01_to_2025-06-30.json");
+  const liveGl = readJson(windowFile);
   assert.equal(liveGl.from_date, "2025-01-01");
   assert.equal(liveGl.to_date, "2025-06-30");
 
   const run = sync.getStatus().data.last_run;
   assert.equal(run.from_date, "2025-01-01");
   assert.equal(run.to_date, "2025-06-30");
+  assert.equal(run.counts.window_cache, path.join("live-gl", "windows", "myob-live-gl-2025-01-01_to_2025-06-30.json"));
+  assert.ok(run.counts.skipped_writes.includes("shared-live-gl"));
 });
 
 test("an open-ended pull leaves the journal fetch unbounded (no le clause)", async () => {

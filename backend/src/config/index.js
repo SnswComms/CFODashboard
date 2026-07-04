@@ -116,8 +116,30 @@ module.exports = {
   allowanceLiveSendEnabled: process.env.SNSW_ALLOWANCE_EMAIL_LIVE_SEND === "1",
   betterAuthSecret: process.env.BETTER_AUTH_SECRET || "",
   appOrigin: process.env.APP_ORIGIN || "http://localhost:3000",
+  // Origins Better Auth will accept, comma-separated (defaults to appOrigin).
+  // On the tailnet we trust BOTH the direct Tailscale-IP HTTP origin and the
+  // HTTPS Serve origin, so login works from either address.
+  trustedOrigins: (process.env.TRUSTED_ORIGINS || process.env.APP_ORIGIN || "http://localhost:3000")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean),
+  // Secure cookies require HTTPS. Serving over plain HTTP on the (already
+  // WireGuard-encrypted) tailnet needs this off so the session cookie sticks;
+  // set AUTH_SECURE_COOKIES=1 for an HTTPS-only deployment.
+  authSecureCookies: process.env.AUTH_SECURE_COOKIES === "1",
   emailFrom: process.env.EMAIL_FROM || "",
   googleUser: process.env.GOOGLE_USER || "",
   googleAppPass: process.env.GOOGLE_APP_PASS || "",
   emailDryRun: process.env.EMAIL_DRY_RUN === "1",
+  titheMonthlyEmail: {
+    schedulerEnabled: process.env.TITHE_MONTHLY_EMAIL_SCHEDULER_ENABLED === "1",
+    liveSend: process.env.TITHE_MONTHLY_EMAIL_LIVE_SEND === "1",
+    dayOfMonth: Number(process.env.TITHE_MONTHLY_EMAIL_DAY || 5),
+    checkHour: Number(process.env.TITHE_MONTHLY_EMAIL_CHECK_HOUR || 9),
+    churchIds: (process.env.TITHE_MONTHLY_EMAIL_CHURCH_IDS || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+    testTo: process.env.TITHE_MONTHLY_EMAIL_TEST_TO || null,
+  },
 };

@@ -8,6 +8,7 @@
 
 import { useCallback, useState, type CSSProperties } from 'react';
 import { useApiGet, useApiGetEnvelope } from '@/lib/api';
+import { useDateRange } from '@/lib/dateRange';
 import { color, tint, FONT } from '@/lib/format';
 import MetricRefreshControl from '@/components/MetricRefreshControl';
 import type { MetricRefreshDoc } from '@/lib/useMetricRefresh';
@@ -224,12 +225,13 @@ interface FreshKpi {
 }
 
 export default function Overview() {
+  const dateRange = useDateRange();
   // Envelope-preserving fetch: meta.warnings carries live data-health issues
   // (sync errors, stale cache) surfaced in the "Data warnings" card below.
-  const overviewEnv = useApiGetEnvelope<OverviewPayload>('/command-centre/overview');
+  const overviewEnv = useApiGetEnvelope<OverviewPayload>(`/command-centre/overview?${dateRange.query}`);
   const data = overviewEnv?.data ?? FALLBACK;
   const warnings = overviewEnv?.meta.warnings ?? [];
-  const operating = useApiGet<OperatingPayload>('/command-centre/functions', OPERATING_FALLBACK);
+  const operating = useApiGet<OperatingPayload>(`/command-centre/functions?${dateRange.query}`, OPERATING_FALLBACK);
 
   // Shell owns view state and listens for 'cc:navigate' window events; the
   // handler validates the id and calls setView(id) (design: setView in app-script.js).
@@ -322,6 +324,7 @@ export default function Overview() {
       >
         The single place to read the conference&#39;s financial position — operating pressure,
         budget capacity, staffing, cash and the health of every data source feeding these pages.
+        {dateRange.refreshing ? ' Pulling a fresh MYOB window for this range.' : ''}
       </p>
 
       {/* Metric cards with sparklines */}

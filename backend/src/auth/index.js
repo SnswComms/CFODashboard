@@ -72,7 +72,10 @@ const auth = betterAuth({
   secret: config.betterAuthSecret || undefined,
   baseURL: config.appOrigin, // http://localhost:3000
   basePath: "/api/auth",
-  trustedOrigins: [config.appOrigin],
+  trustedOrigins: config.trustedOrigins,
+  // Over plain HTTP on the tailnet the session cookie must not be Secure-only,
+  // or it never reaches the browser. Toggle via AUTH_SECURE_COOKIES.
+  advanced: { useSecureCookies: config.authSecureCookies },
   // Synthetic/test mode (no MONGODB_URI): ephemeral in-memory adapter.
   // DEVIATION from AUTH-CONTRACT section 2.1 (which specified memoryAdapter({})):
   // the 1.6.x memory adapter throws "Model user not found" for lookups against

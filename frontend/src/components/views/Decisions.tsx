@@ -8,6 +8,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { apiPost } from '@/lib/api';
+import { useDateRange } from '@/lib/dateRange';
 import { chipDefs, thinkSteps } from '@/lib/designData';
 import { FONT } from '@/lib/format';
 
@@ -27,6 +28,7 @@ const FALLBACK_ANSWER =
   'I couldn’t reach the analysis service just now — please try again in a moment. The figures on each budget page are still current in the meantime.';
 
 export default function Decisions() {
+  const dateRange = useDateRange();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [thinking, setThinking] = useState(false);
@@ -54,7 +56,12 @@ export default function Decisions() {
     };
     // The copilot may run through the local LLM (tens of seconds), so override
     // the 3s default timeout; the backend gives up at ~45s and falls back.
-    const res = await apiPost<CopilotResponse>('/command-centre/copilot', { messages: apiMsgs }, fallback, 60_000);
+    const res = await apiPost<CopilotResponse>(
+      `/command-centre/copilot?${dateRange.query}`,
+      { messages: apiMsgs },
+      fallback,
+      60_000
+    );
     const answer =
       res && typeof res.answer === 'string' && res.answer.trim() ? res.answer : FALLBACK_ANSWER;
     if (timerRef.current) {

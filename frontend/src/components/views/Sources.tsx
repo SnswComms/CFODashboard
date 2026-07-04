@@ -12,6 +12,7 @@
 
 import { useCallback, useState } from 'react';
 import { useApiGet } from '@/lib/api';
+import { useDateRange } from '@/lib/dateRange';
 import { color, fmtF, FONT, tint } from '@/lib/format';
 import MyobRefreshPanel from '@/components/MyobRefreshPanel';
 import MetricRefreshControl from '@/components/MetricRefreshControl';
@@ -215,7 +216,8 @@ const statusTagStyle = (tone: string): React.CSSProperties => ({
 });
 
 export default function Sources() {
-  const payload = useApiGet<SourcesPayload>('/command-centre/sources', FALLBACK);
+  const dateRange = useDateRange();
+  const payload = useApiGet<SourcesPayload>(`/command-centre/sources?${dateRange.query}`, FALLBACK);
   const rows = { evidence: toEvidenceRows(payload), freshness: toFreshnessRows(payload) };
   // Trust-panel feeds; null fallback hides each section (page degrades to the
   // two-column layout above, pixel-identical to the design rendering).

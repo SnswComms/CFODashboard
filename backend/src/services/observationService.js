@@ -15,6 +15,7 @@ const path = require("path");
 
 const config = require("../config");
 const { chatComplete } = require("../lib/qwenClient");
+const { writeJsonFile } = require("../repositories/jsonFileRepository");
 
 let memory = { key: null, sentence: null };
 let pending = null; // { key, promise } — dedupes concurrent first loads
@@ -43,7 +44,7 @@ function saveDiskCache() {
   const file = cachePath();
   if (!file) return;
   try {
-    fs.writeFileSync(file, JSON.stringify(memory));
+    writeJsonFile(file, memory);
   } catch (error) {
     console.warn(`observation: could not persist cache (${error.message})`);
   }

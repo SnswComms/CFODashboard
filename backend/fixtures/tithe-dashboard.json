@@ -1,0 +1,58 @@
+{
+  "generated_at": "2026-07-04T07:30:00+10:00",
+  "conference": {
+    "name": "South NSW Conference",
+    "as_of": "June 2026",
+    "monthly_email": "Scheduled for the 5th business day",
+    "churches_reporting": 72,
+    "churches_total": 78,
+    "year_target": 5600000,
+    "prior_year_total": 5260000
+  },
+  "churches": [
+    {
+      "id": "wagga-wagga",
+      "name": "Wagga Wagga Church",
+      "district": "Riverina",
+      "pastor": "District Pastor",
+      "members": 186,
+      "recipient": "treasurer.wagga@example.org",
+      "monthly": [
+        { "month": "Jan", "current": 42100, "prior": 38900, "conference": 421000 },
+        { "month": "Feb", "current": 39850, "prior": 40200, "conference": 407800 },
+        { "month": "Mar", "current": 44880, "prior": 42150, "conference": 438200 },
+        { "month": "Apr", "current": 46240, "prior": 43210, "conference": 449600 },
+        { "month": "May", "current": 43820, "prior": 41740, "conference": 432900 },
+        { "month": "Jun", "current": 47190, "prior": 44980, "conference": 461700 },
+        { "month": "Jul", "current": 0, "prior": 43120, "conference": 0 },
+        { "month": "Aug", "current": 0, "prior": 45560, "conference": 0 },
+        { "month": "Sep", "current": 0, "prior": 43940, "conference": 0 },
+        { "month": "Oct", "current": 0, "prior": 46870, "conference": 0 },
+        { "month": "Nov", "current": 0, "prior": 47240, "conference": 0 },
+        { "month": "Dec", "current": 0, "prior": 49820, "conference": 0 }
+      ]
+    },
+    {
+      "id": "canberra-national",
+      "name": "Canberra National Church",
+      "district": "ACT",
+      "pastor": "District Pastor",
+      "members": 312,
+      "recipient": "treasurer.canberra@example.org",
+      "monthly": [
+        { "month": "Jan", "current": 73900, "prior": 71200, "conference": 421000 },
+        { "month": "Feb", "current": 70450, "prior": 68900, "conference": 407800 },
+        { "month": "Mar", "current": 76820, "prior": 74100, "conference": 438200 },
+        { "month": "Apr", "current": 78340, "prior": 75600, "conference": 449600 },
+        { "month": "May", "current": 75110, "prior": 73950, "conference": 432900 },
+        { "month": "Jun", "current": 80680, "prior": 77900, "conference": 461700 },
+        { "month": "Jul", "current": 0, "prior": 76100, "conference": 0 },
+        { "month": "Aug", "current": 0, "prior": 79300, "conference": 0 },
+        { "month": "Sep", "current": 0, "prior": 78200, "conference": 0 },
+        { "month": "Oct", "current": 0, "prior": 80100, "conference": 0 },
+        { "month": "Nov", "current": 0, "prior": 81400, "conference": 0 },
+        { "month": "Dec", "current": 0, "prior": 84500, "conference": 0 }
+      ]
+    }
+  ]
+}

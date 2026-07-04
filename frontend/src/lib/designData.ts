@@ -11,6 +11,7 @@ import { fmtC, fmtF } from './format';
 export type ViewKey =
   | 'overview'
   | 'operating'
+  | 'tithe'
   | 'departments'
   | 'decisions'
   | 'staffing'
@@ -31,6 +32,7 @@ export const navGroupDefs: NavGroupDef[] = [
     label: 'Budget & spend',
     items: [
       ['operating', 'Operating position'],
+      ['tithe', 'Tithe faithfulness'],
       ['departments', 'Department budgets'],
       ['decisions', 'Decision copilot'],
     ],
@@ -55,6 +57,7 @@ export const navGroupDefs: NavGroupDef[] = [
 export const viewKeys: ViewKey[] = [
   'overview',
   'operating',
+  'tithe',
   'departments',
   'decisions',
   'staffing',
@@ -72,6 +75,7 @@ export function isViewKey(value: string): value is ViewKey {
 export const viewMetaMap: Record<ViewKey, { eyebrow: string; title: string }> = {
   overview: { eyebrow: 'Overview', title: 'Command centre' },
   operating: { eyebrow: 'Budget & spend', title: 'Operating position' },
+  tithe: { eyebrow: 'Stewardship', title: 'Tithe faithfulness' },
   departments: { eyebrow: 'Budget & spend', title: 'Department budgets' },
   decisions: { eyebrow: 'Budget & spend', title: 'Decision copilot' },
   staffing: { eyebrow: 'People', title: 'Staffing scenario' },
@@ -258,6 +262,7 @@ export interface DashDef {
 
 export const dashDefs: DashDef[] = [
   { id: 'operating', title: 'Operating position', desc: 'Income, spend and net against the approved FY2026 budget.', status: 'Watch', tone: 'warn' },
+  { id: 'tithe', title: 'Tithe faithfulness', desc: 'Monthly church giving, year-over-year tracking and conference contribution share.', status: 'Monthly', tone: 'good' },
   { id: 'departments', title: 'Department budgets', desc: 'Budget authority, spend and remaining for every ministry function.', status: '1 over', tone: 'bad' },
   { id: 'decisions', title: 'Decision copilot', desc: 'Ask any budget question in plain language and get a grounded answer.', status: 'AI', tone: 'good' },
   { id: 'staffing', title: 'Staffing scenario', desc: '2027 FTE affordability against a tithe-only ceiling.', status: 'Scenario', tone: 'neutral' },
@@ -427,4 +432,76 @@ export const chipDefs: string[] = [
   'Faith FM needs $2,500 for new microphones — can we cover it?',
   'The President was invited to the USA (~$3,500). Affordable?',
   'Which functions are most at risk of overspending?',
+];
+
+// ---------------------------------------------------------------------------
+// Tithe faithfulness
+// ---------------------------------------------------------------------------
+
+export interface TitheMonth {
+  month: string;
+  current: number;
+  prior: number;
+  conference: number;
+}
+
+export interface TitheChurch {
+  name: string;
+  district: string;
+  pastor: string;
+  members: number;
+  monthly: TitheMonth[];
+}
+
+export const titheConference = {
+  name: 'South NSW Conference',
+  asOf: 'June 2026',
+  monthlyEmail: 'Scheduled for the 5th business day',
+  churchesReporting: 72,
+  churchesTotal: 78,
+  yearTarget: 5600000,
+  priorYearTotal: 5260000,
+};
+
+export const titheChurches: TitheChurch[] = [
+  {
+    name: 'Wagga Wagga Church',
+    district: 'Riverina',
+    pastor: 'District Pastor',
+    members: 186,
+    monthly: [
+      { month: 'Jan', current: 42100, prior: 38900, conference: 421000 },
+      { month: 'Feb', current: 39850, prior: 40200, conference: 407800 },
+      { month: 'Mar', current: 44880, prior: 42150, conference: 438200 },
+      { month: 'Apr', current: 46240, prior: 43210, conference: 449600 },
+      { month: 'May', current: 43820, prior: 41740, conference: 432900 },
+      { month: 'Jun', current: 47190, prior: 44980, conference: 461700 },
+      { month: 'Jul', current: 0, prior: 43120, conference: 0 },
+      { month: 'Aug', current: 0, prior: 45560, conference: 0 },
+      { month: 'Sep', current: 0, prior: 43940, conference: 0 },
+      { month: 'Oct', current: 0, prior: 46870, conference: 0 },
+      { month: 'Nov', current: 0, prior: 47240, conference: 0 },
+      { month: 'Dec', current: 0, prior: 49820, conference: 0 },
+    ],
+  },
+  {
+    name: 'Canberra National Church',
+    district: 'ACT',
+    pastor: 'District Pastor',
+    members: 312,
+    monthly: [
+      { month: 'Jan', current: 73900, prior: 71200, conference: 421000 },
+      { month: 'Feb', current: 70450, prior: 68900, conference: 407800 },
+      { month: 'Mar', current: 76820, prior: 74100, conference: 438200 },
+      { month: 'Apr', current: 78340, prior: 75600, conference: 449600 },
+      { month: 'May', current: 75110, prior: 73950, conference: 432900 },
+      { month: 'Jun', current: 80680, prior: 77900, conference: 461700 },
+      { month: 'Jul', current: 0, prior: 76100, conference: 0 },
+      { month: 'Aug', current: 0, prior: 79300, conference: 0 },
+      { month: 'Sep', current: 0, prior: 78200, conference: 0 },
+      { month: 'Oct', current: 0, prior: 80100, conference: 0 },
+      { month: 'Nov', current: 0, prior: 81400, conference: 0 },
+      { month: 'Dec', current: 0, prior: 84500, conference: 0 },
+    ],
+  },
 ];

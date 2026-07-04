@@ -7,14 +7,15 @@
 // the view renders the exact design figures when the backend is unreachable.
 
 import { useCallback, useState } from 'react';
-import { useApiGet } from '@/lib/api';
+import { useApiGet, useApiGetEnvelopeState } from '@/lib/api';
+import { useDateRange } from '@/lib/dateRange';
 import { fmtC, fmtF, color, tint, FONT } from '@/lib/format';
 import MetricRefreshControl from '@/components/MetricRefreshControl';
 import type { MetricRefreshDoc } from '@/lib/useMetricRefresh';
 // Contract types (GET /api/command-centre/functions, §2) and the design-figure
 // fallback are shared with the Overview view via lib/commandCentre.
 import { OPERATING_FALLBACK as FALLBACK } from '@/lib/commandCentre';
-import type { OperatingPayload, OpFunction } from '@/lib/commandCentre';
+import type { OperatingPayload, OpFunction, OpMonthly } from '@/lib/commandCentre';
 
 // ---------------------------------------------------------------------------
 // Chart math, ported verbatim from the design's app-script.js
@@ -54,6 +55,45 @@ function buildDonut(functions: OpFunction[]): { segs: DonutSeg[]; center: string
   return { segs, center: fmtC(total) };
 }
 
+interface MonthlyChartPoint {
+  row: OpMonthly;
+  x: number;
+  incomeY: number | null;
+  expenseY: number | null;
+  netY: number | null;
+}
+
+function buildMonthlyChart(monthly: OpMonthly[]) {
+  const rows = monthly.length > 0 ? monthly : FALLBACK.monthly ?? [];
+  const values = rows.flatMap((row) => [row.income, row.expense, row.net]).filter((value): value is number => typeof value === 'number');
+  const maxValue = Math.max(...values, 1);
+  const minValue = Math.min(...values, 0);
+  const ceiling = Math.ceil(maxValue / 500000) * 500000 || 500000;
+  const floor = minValue < 0 ? Math.floor(minValue / 500000) * 500000 : 0;
+  const width = 760;
+  const height = 270;
+  const pad = { left: 58, right: 22, top: 18, bottom: 44 };
+  const plotW = width - pad.left - pad.right;
+  const plotH = height - pad.top - pad.bottom;
+  const range = ceiling - floor || 1;
+  const y = (value: number) => pad.top + ((ceiling - value) / range) * plotH;
+  const x = (index: number) => pad.left + (index / Math.max(1, rows.length - 1)) * plotW;
+  const baseline = y(0);
+  const points: MonthlyChartPoint[] = rows.map((row, index) => ({
+    row,
+    x: x(index),
+    incomeY: row.income === null ? null : y(row.income),
+    expenseY: row.expense === null ? null : y(row.expense),
+    netY: row.net === null ? null : y(row.net),
+  }));
+  const netLine = points
+    .filter((point) => point.netY !== null)
+    .map((point) => `${point.x.toFixed(1)},${point.netY!.toFixed(1)}`)
+    .join(' ');
+  const latest = [...rows].reverse().find((row) => typeof row.income === 'number' || typeof row.expense === 'number' || typeof row.net === 'number') ?? null;
+  return { width, height, baseline, points, netLine, floor, ceiling, latest };
+}
+
 // ---------------------------------------------------------------------------
 // Per-metric key-account drilldown refresh (GET /api/myob/metrics catalog +
 // POST /api/myob/metrics/<id>/pull). The set of key-account codes lives in the
@@ -80,6 +120,22 @@ interface MetricCatalog {
 }
 
 const METRIC_CATALOG_FALLBACK: MetricCatalog = { count: 0, metrics: [] };
+
+interface DrilldownIndexItem {
+  account: string;
+  label: string | null;
+  bill_lines: number;
+  bill_total: number;
+  journal_lines: number;
+  journal_net: number;
+  generated_at: string | null;
+}
+
+interface DrilldownIndex {
+  items: DrilldownIndexItem[];
+}
+
+const DRILLDOWN_INDEX_FALLBACK: DrilldownIndex = { items: [] };
 
 const DRILLDOWN_PREFIX = 'account-drilldown-';
 
@@ -117,14 +173,28 @@ interface FreshDrilldown {
 // ---------------------------------------------------------------------------
 
 export default function Operating() {
-  const data = useApiGet<OperatingPayload>('/command-centre/functions', FALLBACK);
+  const dateRange = useDateRange();
+  const { env, failed } = useApiGetEnvelopeState<OperatingPayload>(`/command-centre/functions?${dateRange.query}`);
+  const data = env?.data ?? FALLBACK;
+  const dataWarnings = env?.meta.warnings ?? [];
 
   // Per-metric pull catalog, filtered to the operating drilldown metrics. The
   // code is the id with the `account-drilldown-` prefix stripped.
   const catalog = useApiGet<MetricCatalog>('/myob/metrics', METRIC_CATALOG_FALLBACK);
-  const drilldowns: DrilldownMetric[] = (catalog.metrics ?? [])
+  const drilldownIndex = useApiGet<DrilldownIndex>('/myob/drilldowns', DRILLDOWN_INDEX_FALLBACK);
+  const indexedByCode = new Map((drilldownIndex.items ?? []).map((item) => [item.account, item]));
+  const catalogDrilldowns: DrilldownMetric[] = (catalog.metrics ?? [])
     .filter((m) => m.view === 'operating' && m.id.startsWith(DRILLDOWN_PREFIX))
     .map((m) => ({ id: m.id, label: m.label, code: m.id.slice(DRILLDOWN_PREFIX.length) }));
+  const catalogCodes = new Set(catalogDrilldowns.map((d) => d.code));
+  const summaryOnlyDrilldowns: DrilldownMetric[] = (drilldownIndex.items ?? [])
+    .filter((item) => item.account && !catalogCodes.has(item.account))
+    .map((item) => ({
+      id: `${DRILLDOWN_PREFIX}${item.account}`,
+      label: `${item.label ?? `Account ${item.account}`} drilldown (${item.account})`,
+      code: item.account,
+    }));
+  const drilldowns: DrilldownMetric[] = [...catalogDrilldowns, ...summaryOnlyDrilldowns];
 
   // Fresh per-metric pulls keyed by metric id: a refresh writes the recomputed
   // net figure here so ONLY that row swaps, without refetching the operating
@@ -176,6 +246,7 @@ export default function Operating() {
   // now aligned across every row. Over-budget clamps the fill to 100%.
   const sortedFns = [...fns].sort((a, b) => b.budget - a.budget);
   const paceW = Math.max(0, Math.min(100, elapsed)).toFixed(1) + '%';
+  const monthlyChart = buildMonthlyChart(data.monthly ?? FALLBACK.monthly ?? []);
   const functionBars = sortedFns.slice(0, 8).map((f) => ({
     name: f.name,
     usedFmt: f.used_pct + '%',
@@ -212,6 +283,41 @@ export default function Operating() {
 
   return (
     <div>
+      {dataWarnings.length > 0 && (
+        <div
+          role="status"
+          style={{
+            border: '1px solid #E4D3A1',
+            background: '#FFF8E8',
+            color: '#6F551D',
+            borderRadius: 8,
+            padding: '12px 14px',
+            marginBottom: 22,
+            fontSize: 12.5,
+            lineHeight: 1.45,
+          }}
+        >
+          {dataWarnings[0]}
+        </div>
+      )}
+      {failed && !env && (
+        <div
+          role="status"
+          style={{
+            border: '1px solid #E4D3A1',
+            background: '#FFF8E8',
+            color: '#6F551D',
+            borderRadius: 8,
+            padding: '12px 14px',
+            marginBottom: 22,
+            fontSize: 12.5,
+            lineHeight: 1.45,
+          }}
+        >
+          Live operating data could not be loaded. Showing fallback design figures until the backend responds.
+        </div>
+      )}
+
       {/* Operating KPI grid (template.html lines 340-348) */}
       <div className="cc-grid-4" style={{ gap: 34, borderTop: '1px solid #E7E5DF', paddingTop: 28, marginBottom: 38 }}>
         {kpiCells.map((k) => (
@@ -230,6 +336,82 @@ export default function Operating() {
         <p style={{ fontFamily: FONT, fontWeight: 300, fontSize: 19, lineHeight: 1.45, color: '#39424F', margin: 0, maxWidth: 720 }}>
           {data.observation}
         </p>
+      </div>
+
+      {/* Month-by-month operating movement */}
+      <div style={{ marginBottom: 44 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 18, marginBottom: 18 }}>
+          <div style={eyebrowStyle}>Month by month {'—'} operating movement</div>
+          {monthlyChart.latest && (
+            <div style={{ fontFamily: FONT, fontSize: 9.5, color: '#B7BAC0', letterSpacing: '.04em', textAlign: 'right' }}>
+              {monthlyChart.latest.label} net {fmtF(monthlyChart.latest.net ?? 0)}
+            </div>
+          )}
+        </div>
+        <div style={{ background: '#FFFFFF', border: '1px solid #E7E5DF', borderRadius: 12, padding: '20px 22px 18px' }}>
+          <div style={{ display: 'flex', gap: 18, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
+            {[
+              ['Income', '#3E7A55'],
+              ['Spend', '#41566C'],
+              ['Net', '#A8443B'],
+            ].map(([label, swatch]) => (
+              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 11.5, color: '#757C86' }}>
+                <span style={{ width: 10, height: 10, borderRadius: 2, background: swatch }} />
+                <span>{label}</span>
+              </div>
+            ))}
+          </div>
+          <svg viewBox={`0 0 ${monthlyChart.width} ${monthlyChart.height}`} role="img" aria-label="Month by month operating income, spend and net" style={{ display: 'block', width: '100%', height: 'auto' }}>
+            <line x1={58} x2={738} y1={monthlyChart.baseline} y2={monthlyChart.baseline} stroke="#D9D7D0" strokeWidth={1} />
+            {[monthlyChart.floor, 0, monthlyChart.ceiling].filter((value, index, all) => all.indexOf(value) === index).map((value) => {
+              const y = 18 + ((monthlyChart.ceiling - value) / (monthlyChart.ceiling - monthlyChart.floor || 1)) * (270 - 18 - 44);
+              return (
+                <g key={value}>
+                  <line x1={58} x2={738} y1={y} y2={y} stroke={value === 0 ? '#D9D7D0' : '#F0EEE8'} strokeWidth={1} />
+                  <text x={48} y={y + 4} textAnchor="end" fontSize={10} fill="#9AA0A8" style={{ fontFamily: FONT }}>
+                    {fmtC(value)}
+                  </text>
+                </g>
+              );
+            })}
+            {monthlyChart.points.map((point) => {
+              const barW = 13;
+              return (
+                <g key={point.row.month}>
+                  {point.row.income !== null && (
+                    <rect
+                      x={point.x - barW - 1}
+                      y={Math.min(point.incomeY!, monthlyChart.baseline)}
+                      width={barW}
+                      height={Math.max(2, Math.abs(monthlyChart.baseline - point.incomeY!))}
+                      rx={3}
+                      fill="#3E7A55"
+                    />
+                  )}
+                  {point.row.expense !== null && (
+                    <rect
+                      x={point.x + 1}
+                      y={Math.min(point.expenseY!, monthlyChart.baseline)}
+                      width={barW}
+                      height={Math.max(2, Math.abs(monthlyChart.baseline - point.expenseY!))}
+                      rx={3}
+                      fill="#41566C"
+                    />
+                  )}
+                  <text x={point.x} y={248} textAnchor="middle" fontSize={10} fill={point.row.net === null ? '#C6CAD1' : '#757C86'} style={{ fontFamily: FONT }}>
+                    {point.row.label}
+                  </text>
+                </g>
+              );
+            })}
+            {monthlyChart.netLine && (
+              <polyline points={monthlyChart.netLine} fill="none" stroke="#A8443B" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+            )}
+            {monthlyChart.points.filter((point) => point.netY !== null).map((point) => (
+              <circle key={`net-${point.row.month}`} cx={point.x} cy={point.netY!} r={3.5} fill="#A8443B" stroke="#FFFFFF" strokeWidth={1.5} />
+            ))}
+          </svg>
+        </div>
       </div>
 
       {/* Donut + composition */}
@@ -378,6 +560,7 @@ export default function Operating() {
           <div style={{ background: '#FFFFFF', border: '1px solid #E7E5DF', borderRadius: 12, padding: '22px 24px' }}>
             {drilldowns.map((d, i) => {
               const fresh = freshById[d.id];
+              const indexed = indexedByCode.get(d.code);
               return (
                 <div
                   key={d.id}
@@ -416,6 +599,11 @@ export default function Operating() {
                       <>
                         {fresh.netFmt}{' '}
                         <span style={{ color: '#B7BAC0' }}>· {fresh.journalsScanned}</span>
+                      </>
+                    ) : indexed ? (
+                      <>
+                        {fmtF(indexed.journal_net)}{' '}
+                        <span style={{ color: '#B7BAC0' }}>· {indexed.journal_lines}</span>
                       </>
                     ) : (
                       'not pulled'

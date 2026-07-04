@@ -25,6 +25,7 @@ const FIXTURES = {
 };
 
 const DRILLDOWN_FILE_PATTERN = /^myob-account-([0-9]+)-drilldown\.json$/;
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 // Flatten MYOB Advanced {value: x} wrappers, drop custom/_links/note, and keep
 // nested arrays (e.g. journal Details) — mirrors the Python simp() helper but
@@ -85,6 +86,20 @@ function loadLiveGl() {
     candidates: [{ dirKey: "myobCache", file: CACHE_FILES.liveGl }],
     fixture: FIXTURES.liveGl,
   });
+}
+
+function windowCacheFile(fromDate, toDate) {
+  if (!ISO_DATE_PATTERN.test(String(fromDate || "")) || !ISO_DATE_PATTERN.test(String(toDate || ""))) return null;
+  return path.join("live-gl", "windows", `myob-live-gl-${fromDate}_to_${toDate}.json`);
+}
+
+function loadLiveGlForRange(range = {}) {
+  const file = windowCacheFile(range.fromDate, range.toDate);
+  if (!file) return loadLiveGl();
+  const exact = resolveData({
+    candidates: [{ dirKey: "myobCache", file }],
+  });
+  return exact.meta.dataSource === "live-cache" ? exact : loadLiveGl();
 }
 
 // Summary file only exists next to a live extract; callers derive a summary
@@ -186,6 +201,8 @@ module.exports = {
   normalizeBroadCache,
   loadBroad,
   loadLiveGl,
+  loadLiveGlForRange,
+  windowCacheFile,
   loadLiveGlSummary,
   loadBenefits,
   loadDrilldown,

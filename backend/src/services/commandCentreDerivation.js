@@ -68,10 +68,19 @@ function deptForSubaccount(subaccount) {
 }
 
 function monthOf(line) {
+  const date = new Date(String(line.date || ""));
+  if (!Number.isNaN(date.getTime())) return date.getUTCMonth() + 1;
   const fromPeriod = Number(String(line.period || "").slice(0, 2));
   if (fromPeriod >= 1 && fromPeriod <= 12) return fromPeriod;
-  const date = new Date(String(line.date || ""));
-  return Number.isNaN(date.getTime()) ? null : date.getUTCMonth() + 1;
+  return null;
+}
+
+function rangeLabel(range) {
+  if (!range || (!range.fromDate && !range.toDate)) return null;
+  if (range.label) return range.label;
+  if (range.fromDate && range.toDate) return `${range.fromDate} to ${range.toDate}`;
+  if (range.fromDate) return `From ${range.fromDate}`;
+  return `To ${range.toDate}`;
 }
 
 // One normalized record per usable journal line. Bill lines are deliberately
@@ -79,12 +88,15 @@ function monthOf(line) {
 // and AP bill lines are evidence only. Post-dated journals (the tenant carries
 // accrual/recurring batches dated months ahead) are excluded so YTD sums stay
 // honest as-of the extract date.
-function normalizeLines(doc) {
+function normalizeLines(doc, range = {}) {
   const classes = classifyAccounts(doc.accounts);
   const asOf = String(doc.generated_at ?? "").slice(0, 10);
   const lines = [];
   for (const raw of doc.journal_lines || []) {
     if (asOf && raw.date && String(raw.date).slice(0, 10) > asOf) continue;
+    const date = String(raw.date || "").slice(0, 10);
+    if (range.fromDate && (!date || date < range.fromDate)) continue;
+    if (range.toDate && (!date || date > range.toDate)) continue;
     const kind = lineKind(classes.get(String(raw.account ?? "")));
     if (kind === "skip") continue;
     const debit = Number(raw.debit) || 0;
@@ -147,7 +159,23 @@ function laneMatchesFrom(lines, def) {
 
 // Calendar-year elapsed % at the cache timestamp (the design constant 42 is
 // 31 May against a Jan–Dec FY2026).
-function periodFrom(generatedAt) {
+function periodFrom(generatedAt, range = {}) {
+  const label = rangeLabel(range);
+  if (label) {
+    const from = range.fromDate ? new Date(`${range.fromDate}T00:00:00Z`) : null;
+    const to = range.toDate ? new Date(`${range.toDate}T00:00:00Z`) : new Date(generatedAt ?? "");
+    const year = to && !Number.isNaN(to.getTime()) ? to.getUTCFullYear() : 2026;
+    const start = Date.UTC(year, 0, 1);
+    const end = Date.UTC(year + 1, 0, 1);
+    const inclusiveTo = to && !Number.isNaN(to.getTime()) ? to.getTime() + 24 * 60 * 60 * 1000 : null;
+    const elapsed = inclusiveTo ? ((inclusiveTo - start) / (end - start)) * 100 : 42;
+    return {
+      label,
+      elapsed_pct: Math.min(100, Math.max(0, Math.round(elapsed))),
+      from_date: range.fromDate ?? null,
+      to_date: range.toDate ?? null,
+    };
+  }
   const at = new Date(generatedAt ?? "");
   if (Number.isNaN(at.getTime())) return { label: "FY2026 to date", elapsed_pct: 42 };
   const year = at.getUTCFullYear();
@@ -155,6 +183,25 @@ function periodFrom(generatedAt) {
   const end = Date.UTC(year + 1, 0, 1);
   const elapsed_pct = Math.min(100, Math.max(0, Math.round(((at.getTime() - start) / (end - start)) * 100)));
   return { label: "FY" + year + " to date", elapsed_pct };
+}
+
+const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function monthStart(year, month) {
+  return `${year}-${String(month).padStart(2, "0")}-01`;
+}
+
+function monthEnd(year, month) {
+  const day = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function monthIsInRange(year, month, range = {}) {
+  const start = monthStart(year, month);
+  const end = monthEnd(year, month);
+  if (range.fromDate && end < range.fromDate) return false;
+  if (range.toDate && start > range.toDate) return false;
+  return true;
 }
 
 function observationFrom(overs, tights) {
@@ -181,17 +228,17 @@ function observationFrom(overs, tights) {
 // meta.warnings. warnings/stale come from the service's sync-health checks
 // (commandCentreService.liveHealth) and drive the data-health KPI, the live
 // freshness entry and the derived alerts below.
-function buildLiveModel(doc, meta, { warnings = [], stale = false } = {}) {
-  const lines = normalizeLines(doc);
+function buildLiveModel(doc, meta, { warnings = [], stale = false } = {}, range = {}) {
+  const lines = normalizeLines(doc, range);
   const generated_at = meta.generated_at ?? doc.generated_at ?? null;
 
   // Extract-level provenance for the /sources evidence registry: how much of
   // the GL cache this derivation saw, and the extract window it covers.
   const sourceCounts = {
     accounts: (doc.accounts || []).length,
-    journal_lines: (doc.journal_lines || []).length,
-    from_date: doc.from_date ?? null,
-    to_date: doc.to_date ?? null,
+    journal_lines: lines.length,
+    from_date: range.fromDate ?? doc.from_date ?? null,
+    to_date: range.toDate ?? doc.to_date ?? null,
   };
 
   const deptSpent = new Map();
@@ -325,6 +372,22 @@ function buildLiveModel(doc, meta, { warnings = [], stale = false } = {}) {
   }
   const trend = { as_of_month: asOfMonth, months: trendMonths };
 
+  const monthlyOperating = [];
+  const monthlyYear = Number.isNaN(extractedAt.getTime()) ? 2026 : extractedAt.getUTCFullYear();
+  for (let month = 1; month <= 12; month++) {
+    const inRange = monthIsInRange(monthlyYear, month, range);
+    const active = inRange && asOfMonth !== null && month <= asOfMonth;
+    const monthIncome = Math.round(monthly.income[month - 1]);
+    const monthExpense = Math.round(monthly.expense[month - 1]);
+    monthlyOperating.push({
+      month,
+      label: MONTH_LABELS[month - 1],
+      income: active ? monthIncome : null,
+      expense: active ? monthExpense : null,
+      net: active ? monthIncome - monthExpense : null,
+    });
+  }
+
   // Real per-month series backing the overview KPI sparklines. KPIs with no
   // monthly dimension (board constants, data health) carry no series — the
   // frontend renders those cards without a sparkline rather than a fake one.
@@ -424,11 +487,12 @@ function buildLiveModel(doc, meta, { warnings = [], stale = false } = {}) {
     entities,
     entityTotal,
     lanes,
-    period: periodFrom(generated_at),
+    period: periodFrom(generated_at, range),
     opKpis,
     overviewKpis,
     composition,
     observation: observationFrom(overs, tights),
+    monthlyOperating,
     trend,
     alerts,
     freshnessEntry,

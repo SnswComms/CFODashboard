@@ -15,7 +15,7 @@ const path = require("path");
 const config = require("../config");
 const { UnavailableError } = require("../lib/errors");
 const myobClient = require("../lib/myobClient");
-const { flattenRecord, pickField } = require("../repositories/myobCacheRepository");
+const { flattenRecord, pickField, windowCacheFile } = require("../repositories/myobCacheRepository");
 const { readJsonFile, writeJsonFile } = require("../repositories/jsonFileRepository");
 const { departmentStatus } = require("./statusRules");
 const approved = require("../constants/approvedBudget");
@@ -871,6 +871,7 @@ async function executeRun(session, run) {
   // Label/summary window end: the requested bound when one was given, else the
   // latest journal date actually seen (an open-ended pull never overstates).
   const toDate = requestedToDate || latest || dateOnly(generatedAt);
+  const isWindowRun = Boolean(run.from_date || run.to_date);
 
   // a (cont). GL cash net movements per 111xxx account (CashAccount is 404 on
   // this tenant) enrich the candidates, then the probe docs are written.
@@ -891,17 +892,19 @@ async function executeRun(session, run) {
     cash_account_candidates: enrichedCandidates,
     gl_cash_movements: glCashMovements,
   };
-  writeJsonFile(config.resolve("myobCache", PROBE_LATEST_FILE), probeDoc);
-  writeJsonFile(config.resolve("myobCache", PROBE_SUMMARY_FILE), {
-    generated_at: generatedAt,
-    base: session.base,
-    ok_endpoints: Object.entries(endpoints)
-      .filter(([, record]) => record.status === 200)
-      .map(([name]) => name),
-    cash_account_candidate_count: enrichedCandidates.length,
-    gl_cash_movement_accounts: glCashMovements.accounts.length,
-    gl_cash_movement_warning: glCashMovements.warning,
-  });
+  if (!isWindowRun) {
+    writeJsonFile(config.resolve("myobCache", PROBE_LATEST_FILE), probeDoc);
+    writeJsonFile(config.resolve("myobCache", PROBE_SUMMARY_FILE), {
+      generated_at: generatedAt,
+      base: session.base,
+      ok_endpoints: Object.entries(endpoints)
+        .filter(([, record]) => record.status === 200)
+        .map(([name]) => name),
+      cash_account_candidate_count: enrichedCandidates.length,
+      gl_cash_movement_accounts: glCashMovements.accounts.length,
+      gl_cash_movement_warning: glCashMovements.warning,
+    });
+  }
 
   if (journalFetchFailed) {
     // Every cache below through the drilldowns is derived from this run's
@@ -910,6 +913,22 @@ async function executeRun(session, run) {
     // zeros as real). The previous run's files stay untouched.
     errors.push("JournalTransaction fetch failed; journal-derived caches left untouched");
     counts.skipped_writes = ["live-gl", "cmf-cash", "departments", "benefits", "account-drilldowns"];
+    if (isWindowRun) {
+      counts.skipped_writes = [
+        "cash-position",
+        "window-live-gl",
+        "shared-live-gl",
+        "cmf-cash",
+        "departments",
+        "broad",
+        "benefits",
+        "account-drilldowns",
+      ];
+      run.counts = counts;
+      run.errors = errors;
+      run.ok = false;
+      return;
+    }
   } else {
     const liveGlDoc = {
       generated_at: generatedAt,
@@ -933,6 +952,28 @@ async function executeRun(session, run) {
       bill_lines: [],
       errors,
     };
+    if (isWindowRun) {
+      const file = windowCacheFile(fromDate, toDate);
+      if (!file) {
+        errors.push("window cache: from_date and to_date are required for an isolated range cache");
+      } else {
+        writeJsonFile(config.resolve("myobCache", file), liveGlDoc);
+        counts.window_cache = file;
+      }
+      counts.skipped_writes = [
+        "cash-position",
+        "shared-live-gl",
+        "cmf-cash",
+        "departments",
+        "broad",
+        "benefits",
+        "account-drilldowns",
+      ];
+      run.counts = counts;
+      run.errors = errors;
+      run.ok = errors.length === 0;
+      return;
+    }
     writeJsonFile(config.resolve("myobCache", LIVE_GL_LATEST_FILE), liveGlDoc);
     writeJsonFile(config.resolve("myobCache", LIVE_GL_SUMMARY_FILE), {
       generated_at: generatedAt,
@@ -1064,16 +1105,19 @@ function getStatus() {
   const filePath = statusFilePath();
   const persisted = readJsonFile(filePath);
   const lastRun = (persisted && persisted.last_run) ?? null;
+  const orphanedRun = !currentRun && lastRun && !lastRun.finishedAt && lastRun.ok === null;
   return {
     data: {
       running: currentRun !== null,
       current_run: currentRun ? currentRun.info : null,
       last_run: lastRun,
+      orphaned_run: Boolean(orphanedRun),
     },
     meta: {
       dataSource: persisted ? "live-cache" : "missing",
       sourcePath: filePath,
       generated_at: (lastRun && (lastRun.finishedAt || lastRun.startedAt)) ?? null,
+      warnings: orphanedRun ? ["previous sync did not finish in this server process; start a fresh sync to replace it"] : [],
     },
   };
 }

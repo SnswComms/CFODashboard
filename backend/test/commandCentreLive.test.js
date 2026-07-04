@@ -78,6 +78,13 @@ function assertLiveMeta(body) {
   assert.equal(body.data.generated_at, GENERATED_AT);
 }
 
+function writeWindowCache(fromDate, toDate, doc) {
+  const file = path.join(cacheDir, "live-gl", "windows", `myob-live-gl-${fromDate}_to_${toDate}.json`);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, JSON.stringify(doc, null, 2));
+  return file;
+}
+
 test("GET /functions derives spent from GL expense lines by subaccount prefix", async () => {
   await withServer(async (base) => {
     const { status, body } = await requestJson(base, "/api/command-centre/functions");
@@ -109,6 +116,11 @@ test("GET /functions derives spent from GL expense lines by subaccount prefix", 
     assert.equal(body.data.kpis[2].tone, "good");
     assert.equal(body.data.kpis[3].value, "0");
     assert.deepEqual(body.data.composition.map((c) => c.spent), [380000, 264000]);
+    assert.equal(body.data.monthly.length, 12);
+    assert.deepEqual(body.data.monthly[0], { month: 1, label: "Jan", income: 0, expense: 12000, net: -12000 });
+    assert.deepEqual(body.data.monthly[1], { month: 2, label: "Feb", income: 0, expense: -2000, net: 2000 });
+    assert.deepEqual(body.data.monthly[4], { month: 5, label: "May", income: 380000, expense: 0, net: 380000 });
+    assert.deepEqual(body.data.monthly[5], { month: 6, label: "Jun", income: null, expense: null, net: null });
     // 30 June = 180 of 365 days elapsed in FY2026.
     assert.deepEqual(body.data.period, { label: "FY2026 to date", elapsed_pct: 49 });
   });
@@ -301,5 +313,110 @@ test("POST /copilot cites live-derived lane and function figures", async () => {
     });
     assert.deepEqual(youth.body.data.matched, { kind: "lane", id: "youth" });
     assert.match(youth.body.data.answer, /spent figure is unverified — check source/);
+  });
+});
+
+test("date range filters live command-centre figures and copilot grounding", async () => {
+  await withServer(async (base) => {
+    const qs = "range=month&from_date=2026-03-01&to_date=2026-03-31";
+    const functions = await requestJson(base, `/api/command-centre/functions?${qs}`);
+    assert.equal(functions.status, 200);
+    assertLiveMeta(functions.body);
+    assert.deepEqual(functions.body.data.period, {
+      label: "This month",
+      elapsed_pct: 25,
+      from_date: "2026-03-01",
+      to_date: "2026-03-31",
+    });
+    const byName = Object.fromEntries(functions.body.data.functions.map((fn) => [fn.name, fn]));
+    assert.equal(byName["Field"].spent, 200000);
+    assert.equal(byName["Administration"].spent, 4000);
+    assert.equal(byName["Evangelism"].spent, 0);
+    assert.equal(functions.body.data.kpis[0].value, "$0K");
+    assert.equal(functions.body.data.kpis[1].value, "$204K");
+    assert.equal(functions.body.data.kpis[2].value, "($204K)");
+    assert.deepEqual(functions.body.data.monthly[1], { month: 2, label: "Feb", income: null, expense: null, net: null });
+    assert.deepEqual(functions.body.data.monthly[2], { month: 3, label: "Mar", income: 0, expense: 204000, net: -204000 });
+    assert.deepEqual(functions.body.data.monthly[3], { month: 4, label: "Apr", income: null, expense: null, net: null });
+
+    const overview = await requestJson(base, `/api/command-centre/overview?${qs}`);
+    assert.equal(overview.status, 200);
+    assert.equal(overview.body.data.kpis[0].value, "($204K)");
+    assert.deepEqual(overview.body.data.totals, { income: 0, expense: 204000, net: -204000 });
+    assert.equal(overview.body.data.trend.as_of_month, 3);
+    assert.deepEqual(overview.body.data.trend.months[2], { month: 3, income: 0, expense: 204000 });
+
+    const sources = await requestJson(base, `/api/command-centre/sources?${qs}`);
+    assert.equal(sources.status, 200);
+    assert.equal(sources.body.data.evidence[1].value, "2");
+    assert.equal(sources.body.data.evidence[1].basis, "JournalTransaction extract 2026-03-01 → 2026-03-31");
+
+    const copilot = await requestJson(base, `/api/command-centre/copilot?${qs}`, {
+      method: "POST",
+      body: { messages: [{ role: "user", content: "How is Field tracking this month?" }] },
+    });
+    assert.equal(copilot.status, 200);
+    assert.deepEqual(copilot.body.data.matched, { kind: "function", id: "Field" });
+    assert.match(copilot.body.data.answer, /\$200,000/);
+    assert.match(copilot.body.data.answer, /6% used/);
+  });
+});
+
+test("exact date range prefers an isolated window cache over the shared latest cache", async () => {
+  const windowDoc = {
+    ...LIVE_GL_DOC,
+    generated_at: "2026-03-31T00:00:00+00:00",
+    from_date: "2026-03-01",
+    to_date: "2026-03-31",
+    journal_lines: [
+      { kind: "JournalTransaction", date: "2026-03-15", period: "032026", branch: "SNC", account: "703430", account_description: "Local church evangelism", subaccount: "EVA-000", line_description: "March evangelism", debit: 7777, credit: 0, net_debit: 7777 },
+    ],
+  };
+  const file = writeWindowCache("2026-03-01", "2026-03-31", windowDoc);
+
+  await withServer(async (base) => {
+    const qs = "range=month&from_date=2026-03-01&to_date=2026-03-31";
+    const { status, body } = await requestJson(base, `/api/command-centre/functions?${qs}`);
+    assert.equal(status, 200);
+    assert.equal(body.meta.dataSource, "live-cache");
+    assert.equal(body.meta.sourcePath, file);
+    assert.equal(body.data.generated_at, "2026-03-31T00:00:00+00:00");
+    assert.equal(body.data.kpis[1].value, "$8K");
+    const byName = Object.fromEntries(body.data.functions.map((fn) => [fn.name, fn]));
+    assert.equal(byName["Evangelism"].spent, 7777);
+    assert.equal(byName["Field"].spent, 0);
+  });
+});
+
+test("date range warns when the requested window starts before the live cache", async () => {
+  await withServer(async (base) => {
+    const qs = "range=fytd&from_date=2025-07-01&to_date=2026-06-30";
+    const { status, body } = await requestJson(base, `/api/command-centre/overview?${qs}`);
+    assert.equal(status, 200);
+    assertLiveMeta(body);
+    assert.equal(body.meta.warnings.length, 1);
+    assert.match(body.meta.warnings[0], /cache starts at 2026-01-01/);
+    assert.match(body.meta.warnings[0], /Figures are limited to the cached extract window/);
+    assert.equal(body.data.kpis[3].value, "Watch");
+  });
+});
+
+test("full-year views expose cache-end coverage as a note, not a warning", async () => {
+  const windowDoc = {
+    ...LIVE_GL_DOC,
+    generated_at: "2026-11-30T00:00:00+00:00",
+    from_date: "2026-01-01",
+    to_date: "2026-11-30",
+  };
+  writeWindowCache("2026-01-01", "2026-12-31", windowDoc);
+
+  await withServer(async (base) => {
+    const qs = "range=year&from_date=2026-01-01&to_date=2026-12-31";
+    const { status, body } = await requestJson(base, `/api/command-centre/functions?${qs}`);
+    assert.equal(status, 200);
+    assert.equal(body.meta.dataSource, "live-cache");
+    assert.deepEqual(body.meta.warnings, []);
+    assert.equal(body.meta.coverage_notes.length, 1);
+    assert.match(body.meta.coverage_notes[0], /current MYOB cache ends at 2026-11-30/);
   });
 });

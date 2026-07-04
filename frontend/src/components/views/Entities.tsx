@@ -5,6 +5,7 @@
 
 import Link from 'next/link';
 import { useApiGet } from '@/lib/api';
+import { useDateRange } from '@/lib/dateRange';
 import { entDefs } from '@/lib/designData';
 import { fmtF, FONT } from '@/lib/format';
 
@@ -116,7 +117,8 @@ const SignalCell = ({ value }: { value: number | null }) =>
   );
 
 export default function Entities() {
-  const fetched = useApiGet<EntitiesPayload>('/command-centre/entities', fallback);
+  const dateRange = useDateRange();
+  const fetched = useApiGet<EntitiesPayload>(`/command-centre/entities?${dateRange.query}`, fallback);
   const payload = fetched && Array.isArray(fetched.entities) && fetched.total ? fetched : fallback;
 
   const { entities, total } = payload;

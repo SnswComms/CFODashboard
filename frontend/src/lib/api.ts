@@ -9,7 +9,7 @@
 // Legacy endpoints (/health, /api/status, /roles*, ...) return unwrapped bodies;
 // the unwrap below passes those through untouched.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export interface ApiMeta {
   dataSource: 'live-cache' | 'synthetic' | 'missing' | string;
@@ -22,6 +22,12 @@ export interface ApiMeta {
 export interface Envelope<T> {
   data: T;
   meta: ApiMeta;
+}
+
+export interface EnvelopeState<T> {
+  env: Envelope<T> | null;
+  loading: boolean;
+  failed: boolean;
 }
 
 const BASE = '/api';
@@ -148,11 +154,14 @@ function normalize(path: string): string {
  */
 export function useApiGet<T>(path: string, fallback: T, timeoutMs?: number): T {
   const [data, setData] = useState<T>(fallback);
+  const seq = useRef(0);
   useEffect(() => {
     let alive = true;
     const load = () => {
+      const requestSeq = seq.current + 1;
+      seq.current = requestSeq;
       apiGet<T>(path, fallback, timeoutMs).then((d) => {
-        if (alive) setData(d);
+        if (alive && seq.current === requestSeq) setData(d);
       });
     };
     load();
@@ -160,10 +169,12 @@ export function useApiGet<T>(path: string, fallback: T, timeoutMs?: number): T {
       if (document.visibilityState === 'visible') load();
     };
     window.addEventListener('focus', onFocus);
+    window.addEventListener('cc:data-refresh', onFocus);
     document.addEventListener('visibilitychange', onFocus);
     return () => {
       alive = false;
       window.removeEventListener('focus', onFocus);
+      window.removeEventListener('cc:data-refresh', onFocus);
       document.removeEventListener('visibilitychange', onFocus);
     };
     // fallback is a stable module-level constant in every caller.
@@ -179,12 +190,25 @@ export function useApiGet<T>(path: string, fallback: T, timeoutMs?: number): T {
  * derive their payload as `env?.data ?? FALLBACK`.
  */
 export function useApiGetEnvelope<T>(path: string, timeoutMs?: number): Envelope<T> | null {
+  return useApiGetEnvelopeState<T>(path, timeoutMs).env;
+}
+
+export function useApiGetEnvelopeState<T>(path: string, timeoutMs?: number): EnvelopeState<T> {
   const [env, setEnv] = useState<Envelope<T> | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+  const seq = useRef(0);
   useEffect(() => {
     let alive = true;
     const load = () => {
+      const requestSeq = seq.current + 1;
+      seq.current = requestSeq;
+      setLoading(true);
       apiGetEnvelope<T>(path, timeoutMs).then((e) => {
-        if (alive) setEnv(e);
+        if (!alive || seq.current !== requestSeq) return;
+        setLoading(false);
+        setFailed(e === null);
+        if (e) setEnv(e);
       });
     };
     load();
@@ -192,12 +216,14 @@ export function useApiGetEnvelope<T>(path: string, timeoutMs?: number): Envelope
       if (document.visibilityState === 'visible') load();
     };
     window.addEventListener('focus', onFocus);
+    window.addEventListener('cc:data-refresh', onFocus);
     document.addEventListener('visibilitychange', onFocus);
     return () => {
       alive = false;
       window.removeEventListener('focus', onFocus);
+      window.removeEventListener('cc:data-refresh', onFocus);
       document.removeEventListener('visibilitychange', onFocus);
     };
   }, [path, timeoutMs]);
-  return env;
+  return { env, loading, failed };
 }

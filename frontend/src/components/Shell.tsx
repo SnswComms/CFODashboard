@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { navGroupDefs, viewMetaMap, isViewKey } from '@/lib/designData';
 import type { ViewKey } from '@/lib/designData';
 import { FONT } from '@/lib/format';
+import { DateRangeContext, resolveRange } from '@/lib/dateRange';
 import AuthScreens from '@/components/AuthScreens';
 import { authClient, useSession } from '@/lib/authClient';
 import { useToast } from '@/components/Toast';
@@ -18,6 +19,9 @@ const RANGE_OPTIONS: Array<[string, string]> = [
   ['year', 'Full year FY2026'],
 ];
 
+const SYNC_POLL_INTERVAL_MS = 3000;
+const SYNC_POLL_ATTEMPTS = 30;
+
 const groupLabelStyle: CSSProperties = {
   fontFamily: FONT,
   fontSize: 9,
@@ -28,16 +32,59 @@ const groupLabelStyle: CSSProperties = {
   padding: '0 10px 8px',
 };
 
+interface SyncRun {
+  ok: boolean | null;
+  counts?: Record<string, unknown>;
+  errors?: string[];
+}
+
+interface SyncStatusPayload {
+  running: boolean;
+  last_run: SyncRun | null;
+}
+
+interface OverviewFingerprint {
+  kpis: unknown;
+  totals: unknown;
+  trend: unknown;
+  warnings: string[];
+}
+
+function countsSummary(counts: Record<string, unknown> | undefined): string {
+  if (!counts) return '';
+  const num = (key: string) => (typeof counts[key] === 'number' ? (counts[key] as number) : null);
+  const parts: string[] = [];
+  const lines = num('journal_lines');
+  const journals = num('journals_scanned');
+  const departments = num('departments');
+  if (lines != null) parts.push(`${lines.toLocaleString('en-US')} journal lines`);
+  if (journals != null) parts.push(`${journals.toLocaleString('en-US')} journals`);
+  if (departments != null) parts.push(`${departments} departments`);
+  return parts.join(' · ');
+}
+
+function fingerprintEqual(a: OverviewFingerprint | null, b: OverviewFingerprint | null): boolean {
+  if (!a || !b) return false;
+  return JSON.stringify({ kpis: a.kpis, totals: a.totals, trend: a.trend }) === JSON.stringify({ kpis: b.kpis, totals: b.totals, trend: b.trend });
+}
+
 export default function Shell({ view, children }: { view: ViewKey; children: ReactNode }) {
   const toast = useToast();
   const router = useRouter();
   const { data: session, isPending } = useSession();
   const [rangeKey, setRangeKey] = useState('fytd');
   const [rangeLabel, setRangeLabel] = useState('FY2026 to date');
+  const [range, setRange] = useState(() => resolveRange('fytd'));
+  const [rangeRefreshing, setRangeRefreshing] = useState(false);
+  const [rangeStatus, setRangeStatus] = useState('');
   const [rangeOpen, setRangeOpen] = useState(false);
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
+  const [customError, setCustomError] = useState('');
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const customFromRef = useRef<HTMLInputElement>(null);
+  const customToRef = useRef<HTMLInputElement>(null);
+  const syncSeqRef = useRef(0);
 
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
@@ -130,21 +177,146 @@ export default function Shell({ view, children }: { view: ViewKey; children: Rea
 
   const viewMeta = viewMetaMap[effectiveView] || viewMetaMap.overview;
 
-  const pickRange = (key: string, label: string) => {
-    setRangeKey(key);
-    setRangeLabel(label);
+  const isLatestSync = (seq: number) => syncSeqRef.current === seq;
+
+  const pollSync = async (seq: number): Promise<SyncRun | null> => {
+    for (let i = 0; i < SYNC_POLL_ATTEMPTS; i += 1) {
+      await new Promise((resolve) => setTimeout(resolve, SYNC_POLL_INTERVAL_MS));
+      if (!isLatestSync(seq)) return null;
+      if (i === 7) setRangeStatus('Still refreshing MYOB data');
+      const res = await fetch('/api/myob/sync/status', { cache: 'no-store' }).catch(() => null);
+      if (!res || !res.ok) continue;
+      const body = await res.json().catch(() => null);
+      if (!body?.data?.running) {
+        window.dispatchEvent(new CustomEvent('cc:data-refresh'));
+        return (body.data as SyncStatusPayload).last_run ?? null;
+      }
+    }
+    return null;
+  };
+
+  const overviewFingerprint = async (query: string): Promise<OverviewFingerprint | null> => {
+    const res = await fetch(`/api/command-centre/overview?${query}`, { cache: 'no-store' }).catch(() => null);
+    if (!res || !res.ok) return null;
+    const body = await res.json().catch(() => null);
+    if (!body?.data) return null;
+    return {
+      kpis: body.data.kpis ?? null,
+      totals: body.data.totals ?? null,
+      trend: body.data.trend ?? null,
+      warnings: Array.isArray(body.meta?.warnings) ? body.meta.warnings : [],
+    };
+  };
+
+  const postRangeSync = (next: ReturnType<typeof resolveRange>) =>
+    fetch('/api/myob/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from_date: next.from, to_date: next.to }),
+    });
+
+  const triggerRangeSync = async (next: ReturnType<typeof resolveRange>, previous: ReturnType<typeof resolveRange>, seq: number) => {
+    setRangeRefreshing(true);
+    setRangeStatus('Updating from MYOB');
+    window.dispatchEvent(new CustomEvent('cc:data-refresh'));
+    toast.info(`${next.label} is loading from cached data while MYOB refreshes.`, 'Date range changed');
+    const before = await overviewFingerprint(previous.query);
+    try {
+      let res = await postRangeSync(next);
+      if (res.status === 202 || res.status === 409) {
+        setRangeStatus(res.status === 409 ? 'Waiting for current MYOB sync' : 'Pulling fresh MYOB data');
+        if (res.status === 409) toast.warn('A MYOB pull is already running. I’ll update the page when it finishes.', 'Refresh queued');
+        let run = await pollSync(seq);
+        if (res.status === 409 && run && isLatestSync(seq)) {
+          setRangeStatus('Pulling fresh MYOB data');
+          res = await postRangeSync(next);
+          run = res.status === 202 ? await pollSync(seq) : null;
+        }
+        if (!isLatestSync(seq)) return;
+        if (run?.ok) {
+          const after = await overviewFingerprint(next.query);
+          window.dispatchEvent(new CustomEvent('cc:data-refresh'));
+          const summary = countsSummary(run.counts);
+          const coverageWarning = after?.warnings.find((warning) => /cached extract window|cache starts|cache ends/i.test(warning));
+          if (coverageWarning) {
+            toast.warn(coverageWarning, 'Range coverage limited');
+          } else if (fingerprintEqual(before, after)) {
+            toast.warn(
+              summary
+                ? `MYOB returned ${summary}, but the visible KPIs and chart are unchanged for ${next.label}.`
+                : `The visible KPIs and chart are unchanged for ${next.label}.`,
+              'No dashboard change'
+            );
+          } else {
+            toast.success(summary ? `Updated ${next.label}: ${summary}.` : `Updated ${next.label}.`, 'MYOB refresh complete');
+          }
+        } else if (run && run.ok === false) {
+          toast.error((run.errors || []).slice(0, 2).join('; ') || 'MYOB refresh finished with errors.', 'MYOB refresh failed');
+        } else {
+          toast.warn('The page updated from the latest available cache. The MYOB refresh is still running in the background.', 'Still refreshing');
+        }
+      } else {
+        if (!isLatestSync(seq)) return;
+        window.dispatchEvent(new CustomEvent('cc:data-refresh'));
+        const body = await res.json().catch(() => null);
+        toast.warn(body?.error || `MYOB refresh did not start (HTTP ${res.status}). Showing cached data.`, 'Using cached data');
+      }
+    } catch {
+      if (!isLatestSync(seq)) return;
+      window.dispatchEvent(new CustomEvent('cc:data-refresh'));
+      toast.error('Could not reach the backend to start the MYOB refresh. Showing cached data.', 'Refresh unavailable');
+    } finally {
+      if (isLatestSync(seq)) {
+        setRangeRefreshing(false);
+        setRangeStatus('');
+      }
+    }
+  };
+
+  const pickRange = (key: string) => {
+    const next = resolveRange(key);
+    if (next.query === range.query) {
+      setRangeOpen(false);
+      return;
+    }
+    const previous = range;
+    const seq = syncSeqRef.current + 1;
+    syncSeqRef.current = seq;
+    setCustomError('');
+    setRangeKey(next.key);
+    setRangeLabel(next.label);
+    setRange(next);
     setRangeOpen(false);
+    void triggerRangeSync(next, previous, seq);
   };
 
   const applyCustom = () => {
-    if (!customFrom || !customTo) return;
-    const f = new Date(customFrom);
-    const t = new Date(customTo);
-    const opt: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' };
-    const label = f.toLocaleDateString('en-AU', opt) + ' – ' + t.toLocaleDateString('en-AU', opt);
-    setRangeKey('custom');
-    setRangeLabel(label);
+    const from = customFrom || customFromRef.current?.value || '';
+    const to = customTo || customToRef.current?.value || '';
+    if (!from || !to) {
+      setCustomError('Choose both dates.');
+      return;
+    }
+    if (from > to) {
+      setCustomError('Start date must be before end date.');
+      return;
+    }
+    setCustomFrom(from);
+    setCustomTo(to);
+    const next = resolveRange('custom', { from, to });
+    if (next.query === range.query) {
+      setRangeOpen(false);
+      return;
+    }
+    const previous = range;
+    const seq = syncSeqRef.current + 1;
+    syncSeqRef.current = seq;
+    setCustomError('');
+    setRangeKey(next.key);
+    setRangeLabel(next.label);
+    setRange(next);
     setRangeOpen(false);
+    void triggerRangeSync(next, previous, seq);
   };
 
   const logout = async () => {
@@ -154,6 +326,7 @@ export default function Shell({ view, children }: { view: ViewKey; children: Rea
   };
 
   return (
+    <DateRangeContext.Provider value={{ ...range, refreshing: rangeRefreshing }}>
     <div
       className="cc-shell"
       style={{
@@ -441,6 +614,7 @@ export default function Shell({ view, children }: { view: ViewKey; children: Rea
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 'none' }}>
               <div data-range="" style={{ position: 'relative' }}>
                 <button
+                  aria-busy={rangeRefreshing}
                   onClick={() => setRangeOpen((o) => !o)}
                   style={{
                     display: 'inline-flex',
@@ -470,16 +644,111 @@ export default function Shell({ view, children }: { view: ViewKey; children: Rea
                     <line x1="8" y1="2" x2="8" y2="6"></line>
                     <line x1="16" y1="2" x2="16" y2="6"></line>
                   </svg>
-                  {rangeLabel}
+                  {rangeRefreshing ? (
+                    <span
+                      aria-hidden
+                      style={{
+                        width: 12,
+                        height: 12,
+                        borderRadius: '50%',
+                        border: '2px solid #E7E5DF',
+                        borderTopColor: '#8A6A2A',
+                        display: 'inline-block',
+                        animation: 'cc-spin 0.72s linear infinite',
+                        flex: 'none',
+                      }}
+                    />
+                  ) : null}
+                  <span>{rangeLabel}</span>
+                  {rangeRefreshing ? (
+                    <span
+                      style={{
+                        fontFamily: FONT,
+                        fontSize: 9,
+                        letterSpacing: '.08em',
+                        textTransform: 'uppercase',
+                        color: '#8A6A2A',
+                        background: '#F7F1E6',
+                        borderRadius: 999,
+                        padding: '2px 7px',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      Live refresh
+                    </span>
+                  ) : null}
                   <span style={{ color: '#B7BAC0', fontSize: 9 }}>▾</span>
                 </button>
+                {rangeRefreshing && (
+                  <div
+                    role="status"
+                    aria-live="polite"
+                    style={{
+                      position: 'absolute',
+                      right: 0,
+                      top: 'calc(100% + 8px)',
+                      width: 286,
+                      background: '#FFFFFF',
+                      border: '1px solid #E7E5DF',
+                      borderRadius: 10,
+                      boxShadow: '0 12px 32px rgba(27,36,48,.12)',
+                      padding: '12px 14px',
+                      zIndex: 70,
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span
+                        aria-hidden
+                        style={{
+                          width: 18,
+                          height: 18,
+                          borderRadius: '50%',
+                          border: '2px solid #E7E5DF',
+                          borderTopColor: '#8A6A2A',
+                          display: 'inline-block',
+                          animation: 'cc-spin 0.72s linear infinite',
+                          flex: 'none',
+                        }}
+                      />
+                      <span style={{ minWidth: 0 }}>
+                        <span style={{ display: 'block', fontSize: 12.5, fontWeight: 500, color: '#1B2430' }}>
+                          {rangeStatus || 'Refreshing MYOB data'}
+                        </span>
+                        <span style={{ display: 'block', fontSize: 11.5, color: '#757C86', marginTop: 3, lineHeight: 1.35 }}>
+                          Showing cached figures now. Charts and Qwen text will update again when the pull finishes.
+                        </span>
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        height: 3,
+                        borderRadius: 999,
+                        background: '#EFEDE7',
+                        overflow: 'hidden',
+                        marginTop: 11,
+                      }}
+                    >
+                      <span
+                        style={{
+                          display: 'block',
+                          width: '38%',
+                          height: '100%',
+                          borderRadius: 999,
+                          background: '#C9A24B',
+                          animation: 'cc-indeterminate 1.2s ease-in-out infinite',
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
                 {rangeOpen && (
                   <div
                     style={{
                       position: 'absolute',
                       right: 0,
                       top: 'calc(100% + 8px)',
-                      width: 272,
+                      width: 'min(320px, calc(100vw - 36px))',
+                      boxSizing: 'border-box',
                       background: '#FFFFFF',
                       border: '1px solid #E7E5DF',
                       borderRadius: 12,
@@ -492,7 +761,7 @@ export default function Shell({ view, children }: { view: ViewKey; children: Rea
                       <button
                         key={key}
                         className="navbtn"
-                        onClick={() => pickRange(key, label)}
+                        onClick={() => pickRange(key)}
                         style={{
                           display: 'flex',
                           justifyContent: 'space-between',
@@ -529,22 +798,52 @@ export default function Shell({ view, children }: { view: ViewKey; children: Rea
                       >
                         Custom range
                       </div>
-                      <div style={{ display: 'flex', gap: 8, padding: '0 7px' }}>
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
+                          gap: 8,
+                          padding: '0 7px',
+                        }}
+                      >
                         <input
+                          ref={customFromRef}
                           type="date"
                           className="fld"
+                          aria-invalid={Boolean(customError)}
                           value={customFrom}
-                          onChange={(e) => setCustomFrom(e.target.value)}
-                          style={{ padding: '8px 9px', fontSize: 12.5 }}
+                          onChange={(e) => {
+                            setCustomFrom(e.target.value);
+                            setCustomError('');
+                          }}
+                          style={{ minWidth: 0, boxSizing: 'border-box', padding: '8px 9px', fontSize: 12.5 }}
                         />
                         <input
+                          ref={customToRef}
                           type="date"
                           className="fld"
+                          aria-invalid={Boolean(customError)}
                           value={customTo}
-                          onChange={(e) => setCustomTo(e.target.value)}
-                          style={{ padding: '8px 9px', fontSize: 12.5 }}
+                          onChange={(e) => {
+                            setCustomTo(e.target.value);
+                            setCustomError('');
+                          }}
+                          style={{ minWidth: 0, boxSizing: 'border-box', padding: '8px 9px', fontSize: 12.5 }}
                         />
                       </div>
+                      {customError ? (
+                        <div
+                          role="alert"
+                          style={{
+                            fontSize: 11.5,
+                            color: '#A8443B',
+                            lineHeight: 1.35,
+                            padding: '7px 7px 0',
+                          }}
+                        >
+                          {customError}
+                        </div>
+                      ) : null}
                       <div style={{ padding: '10px 7px 4px' }}>
                         <button
                           onClick={applyCustom}
@@ -579,5 +878,6 @@ export default function Shell({ view, children }: { view: ViewKey; children: Rea
         </div>
       </main>
     </div>
+    </DateRangeContext.Provider>
   );
 }

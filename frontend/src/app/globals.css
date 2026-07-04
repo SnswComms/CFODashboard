@@ -84,6 +84,22 @@ input[type='range']::-moz-range-thumb {
     opacity: 1;
   }
 }
+@keyframes cc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes cc-indeterminate {
+  0% {
+    transform: translateX(-120%);
+  }
+  55% {
+    transform: translateX(80%);
+  }
+  100% {
+    transform: translateX(280%);
+  }
+}
 .fld {
   width: 100%;
   font-family: var(--font-poppins), 'Poppins', sans-serif;

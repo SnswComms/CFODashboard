@@ -10,6 +10,7 @@ router.use("/api/cash", require("./cash"));
 router.use("/api/command-centre", require("./commandCentre"));
 router.use("/api/myob", require("./myob"));
 router.use("/api/staffing", require("./staffing"));
+router.use("/api/tithe", require("./tithe"));
 router.use(require("./entities"));
 router.use(require("./compat"));
 
